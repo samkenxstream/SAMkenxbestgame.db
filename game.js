@@ -5,10 +5,11 @@ window.onload = function () {
   const gameWidth = TwitchWidth
   const gameHeight = 220
 
-  const PERSON_MOVEMENT_VELOCITY = 60
+  const PERSON_MOVEMENT_VELOCITY = 80
   const PERSON_WIDTH = 61
   const PLAYER_MAX_HEALTH = 45
-  const ENEMY_MAX_HEALTH = 17
+  const ENEMY_MAX_HEALTH = 1 // 17
+  const COMBAT_DISTANCE = 28
 
   const game = new Phaser.Game(gameWidth, gameHeight, Phaser.AUTO, '', {
     preload: preload,
@@ -28,9 +29,14 @@ window.onload = function () {
     3: {}
   }
 
+  let chest
+
   function preload () {
-    game.load.image('person', 'images/stickman_small.png')
     game.load.image('background', 'images/background1.png')
+    game.load.image('person', 'images/stickman_small.png')
+    game.load.image('chest_closed', 'images/chest_closed.png')
+    game.load.image('chest_open', 'images/chest_open.png')
+    game.load.image('chest_closed', 'images/chest_closed.png')
   }
 
   function createFighter (type, x, y, maxHealth) {
@@ -43,13 +49,9 @@ window.onload = function () {
     fighter.maxHealth = maxHealth || ENEMY_MAX_HEALTH
     fighter.health = fighter.maxHealth
 
-    let bar = {
-      color: '#ad4805'
-    }
+    let bar = { color: '#ad4805' }
     if (type === 'player') {
-      bar = {
-        color: '#48ad05'
-      }
+      bar = { color: '#48ad05' }
     }
     fighter.healthBar = new HealthBar(game, {x, y: y - 15, width: 60, height: 10, bar})
     // fighter.addChild(HealthBar(game, {x, y: y - 15, width: 60, height: 10}))
@@ -73,9 +75,11 @@ window.onload = function () {
     players[2] = createFighter('player', game.world.centerX - game.width / 6 - (PERSON_WIDTH + distBetweenFighters), game.world.centerY, PLAYER_MAX_HEALTH)
     players[3] = createFighter('player', game.world.centerX - game.width / 6 - 2 * (PERSON_WIDTH + distBetweenFighters), game.world.centerY, PLAYER_MAX_HEALTH)
 
-    enemies[1] = createFighter('enemy', game.world.centerX + game.width / 8, game.world.centerY)
-    enemies[2] = createFighter('enemy', game.world.centerX + game.width / 8 + PERSON_WIDTH + distBetweenFighters, game.world.centerY)
-    enemies[3] = createFighter('enemy', game.world.centerX + game.width / 8 + 2 * (PERSON_WIDTH + distBetweenFighters), game.world.centerY)
+    enemies[1] = createFighter('enemy', game.world.centerX + COMBAT_DISTANCE, game.world.centerY)
+    enemies[2] = createFighter('enemy', game.world.centerX + COMBAT_DISTANCE + PERSON_WIDTH + distBetweenFighters, game.world.centerY)
+    enemies[3] = createFighter('enemy', game.world.centerX + COMBAT_DISTANCE + 2 * (PERSON_WIDTH + distBetweenFighters), game.world.centerY)
+
+    chest = game.add.sprite(game.world.right - 130, game.world.bottom - 95, 'chest_closed')
   }
 
   function update () {
@@ -131,9 +135,11 @@ window.onload = function () {
       let xDirection
       if (type === 'player') {
         xDirection = 1
-      }
-      if (type === 'enemy') {
+      } else if (type === 'enemy') {
         xDirection = -1
+      } else {
+        console.error('unregonised type', type, 'in movePersons')
+        return
       }
 
       const executeOnPerson = person => {
@@ -143,30 +149,51 @@ window.onload = function () {
       forEachPerson(type, executeOnPerson)
     }
 
+    function isOverlapping (spriteA, spriteB) {
+      const boundsA = spriteA.getBounds()
+      const boundsB = spriteB.getBounds()
+      boundsA.width = boundsA.width + 35
+      return Phaser.Rectangle.intersects(boundsA, boundsB)
+    }
+
+    function distanceToMiddle (sprite) {
+      return Math.min(
+        Math.abs(sprite.body.left - game.world.centerX),
+        Math.abs(sprite.body.right - game.world.centerX)
+      )
+    }
+
     const firstPlayer = getFrontPerson('player')
     const firstEnemy = getFrontPerson('enemy')
     //  Reset the players velocity (movement)
 
-    if (!firstPlayer) {
-      console.info('you lose')
-      game.paused = true
-    } else if (firstEnemy) {
+    if (firstPlayer) {
       forEachPerson('player', player => {
         player.combat.attackTimer--
         player.body.velocity.x = 0
         player.healthBar.setPosition(player.x + 4, player.y - 14)
       })
+    } else {
+      console.info('you lose')
+      game.paused = true
+    }
 
+    if (firstEnemy) {
       forEachPerson('enemy', enemy => {
         enemy.combat.attackTimer--
         enemy.body.velocity.x = 0
         enemy.healthBar.setPosition(enemy.x + 4, enemy.y - 14)
       })
 
-      if (distanceBetweenBounds(firstPlayer, firstEnemy) > 22) {
-        movePersons('player')
+      if (distanceToMiddle(firstEnemy) > COMBAT_DISTANCE / 2) {
         movePersons('enemy')
-      } else {
+      }
+      if (distanceToMiddle(firstPlayer) > COMBAT_DISTANCE / 2) {
+        movePersons('player')
+      }
+
+      if (distanceBetweenBounds(firstPlayer, firstEnemy) <= COMBAT_DISTANCE) {
+      // players and enemies are close, so they attack
         // the first player and first enemy attack each other
         if (firstPlayer.combat.attackTimer <= 0) {
           attackPerson(firstPlayer, firstEnemy)
@@ -176,11 +203,18 @@ window.onload = function () {
         }
       }
     } else {
-      // no enemies are alive
+      // no enemies, continue moving through the level
+      if (Math.abs(firstPlayer.bottom - game.world.bottom) === 0) {
+        movePersons('player')
+      }
+    }
+
+    if (isOverlapping(firstPlayer, chest)) {
+      chest.loadTexture('chest_open')
+      chest.anchor.setTo(0.1, 0.3)
+
       console.info('you win')
-      setTimeout(() => {
-        game.paused = true
-      }, 600)
+      game.paused = true
     }
 
     if (cursors.left.isDown) {
