@@ -68,6 +68,8 @@ window.onload = function () {
     // numFromFront is the number
     const fighter = game.add.sprite(x, y, 'person')
     fighter.anchor.setTo(0.5, 0)
+    fighter.inputEnabled = true
+    fighter.input.useHandCursor = placesFromFront > 0
 
     game.physics.arcade.enable(fighter)
     fighter.body.collideWorldBounds = true
@@ -76,6 +78,18 @@ window.onload = function () {
     fighter.health = fighter.maxHealth
 
     fighter.placesFromFront = placesFromFront
+    fighter.shiftBackwards = (places = 1) => {
+      fighter.placesFromFront += places
+      fighter.input.useHandCursor = fighter.placesFromFront > 0
+    }
+    fighter.shiftToFront = () => {
+      fighter.placesFromFront = 0
+      fighter.input.useHandCursor = fighter.placesFromFront > 0
+    }
+    fighter.shiftForwards = (places = 1) => {
+      fighter.placesFromFront -= places
+      fighter.input.useHandCursor = fighter.placesFromFront > 0
+    }
 
     let bar = { color: '#ad4805' }
     if (type === 'player') {
@@ -154,12 +168,12 @@ window.onload = function () {
     playersToShift.reduce((previousPlayerX, player) => {
       const originalX = player.x
       player.x = previousPlayerX
-      player.placesFromFront++
+      player.shiftBackwards()
       return originalX
     }, playersToShift[0].x)
 
     playerToPush.x = playerAtFrontX // move the player to the front
-    playerToPush.placesFromFront = 0 // move the player to the front
+    playerToPush.shiftToFront() // move the player to the front
     // the player being pushed to the front needs to wait to attack
     // this prevents a player from spam swapping their heroes to attack with each as often as possible
     playerToPush.combat.attackTimer = playerAtFront.combat.attackTimer
