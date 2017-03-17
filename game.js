@@ -59,6 +59,8 @@ window.onload = function () {
   function preload () {
     game.load.image('background', 'images/background1.png')
     game.load.image('person', 'images/stickman_small.png')
+    game.load.image('knight_orange', 'images/characters/knight_orange_60x57.png')
+    game.load.image('knight_blue', 'images/characters/knight_blue_60x57.png')
     game.load.image('chest_closed', 'images/chest_closed.png')
     game.load.image('chest_open', 'images/chest_open.png')
     game.load.image('chest_closed', 'images/chest_closed.png')
@@ -66,7 +68,16 @@ window.onload = function () {
 
   function createFighter (type, x, y, maxHealth, placesFromFront) {
     // numFromFront is the number
-    const fighter = game.add.sprite(x, y, 'person')
+    let fighter
+    switch (type) {
+      case 'player':
+        fighter = game.add.sprite(x, y, 'knight_blue')
+        break
+      case 'enemy':
+        fighter = game.add.sprite(x, y, 'knight_orange')
+        break
+    }
+
     fighter.anchor.setTo(0.5, 0)
     fighter.inputEnabled = true
     fighter.input.useHandCursor = placesFromFront > 0
@@ -91,7 +102,7 @@ window.onload = function () {
       fighter.input.useHandCursor = fighter.placesFromFront > 0
     }
 
-    let bar = { color: '#ad4805' }
+    let bar = { color: '#e2b100' }
     if (type === 'player') {
       bar = { color: '#48ad05' }
       fighter.inputEnabled = true
@@ -127,14 +138,15 @@ window.onload = function () {
     gameStatusText = game.add.text(game.world.right - 220, 0, 'gameStatusText')
 
     const distBetweenFighters = 15
-    players.sprites[0] = createFighter('player', game.world.centerX - game.width / 6, game.world.centerY, PLAYER_MAX_HEALTH, 0)
-    players.sprites[1] = createFighter('player', game.world.centerX - game.width / 6 - (PERSON_WIDTH + distBetweenFighters), game.world.centerY, PLAYER_MAX_HEALTH, 1)
-    players.sprites[2] = createFighter('player', game.world.centerX - game.width / 6 - 2 * (PERSON_WIDTH + distBetweenFighters), game.world.centerY, PLAYER_MAX_HEALTH, 2)
+    const UNIT_HEIGHT = 60
+    players.sprites[0] = createFighter('player', game.world.centerX - game.width / 6, game.world.bottom - UNIT_HEIGHT, PLAYER_MAX_HEALTH, 0)
+    players.sprites[1] = createFighter('player', game.world.centerX - game.width / 6 - (PERSON_WIDTH + distBetweenFighters), game.world.bottom - UNIT_HEIGHT, PLAYER_MAX_HEALTH, 1)
+    players.sprites[2] = createFighter('player', game.world.centerX - game.width / 6 - 2 * (PERSON_WIDTH + distBetweenFighters), game.world.bottom - UNIT_HEIGHT, PLAYER_MAX_HEALTH, 2)
     players.count = 3
 
-    enemies.sprites[0] = createFighter('enemy', game.world.centerX + COMBAT_DISTANCE, game.world.centerY, ENEMY_MAX_HEALTH, 0)
-    enemies.sprites[1] = createFighter('enemy', game.world.centerX + COMBAT_DISTANCE + PERSON_WIDTH + distBetweenFighters, game.world.centerY, ENEMY_MAX_HEALTH, 1)
-    enemies.sprites[2] = createFighter('enemy', game.world.centerX + COMBAT_DISTANCE + 2 * (PERSON_WIDTH + distBetweenFighters), game.world.centerY, ENEMY_MAX_HEALTH, 2)
+    enemies.sprites[0] = createFighter('enemy', game.world.centerX + COMBAT_DISTANCE, game.world.bottom - UNIT_HEIGHT, ENEMY_MAX_HEALTH, 0)
+    enemies.sprites[1] = createFighter('enemy', game.world.centerX + COMBAT_DISTANCE + PERSON_WIDTH + distBetweenFighters, game.world.bottom - UNIT_HEIGHT, ENEMY_MAX_HEALTH, 1)
+    enemies.sprites[2] = createFighter('enemy', game.world.centerX + COMBAT_DISTANCE + 2 * (PERSON_WIDTH + distBetweenFighters), game.world.bottom - UNIT_HEIGHT, ENEMY_MAX_HEALTH, 2)
 
     chest = game.add.sprite(game.world.right - 130, game.world.bottom - 95, 'chest_closed')
   }
@@ -222,19 +234,19 @@ window.onload = function () {
       hitSplat.beginFill(0xba0c0c, 1)
       hitSplat.lineStyle(3, 0x6d0808, 0.8)
       const rect = {
-        x: -26,
-        y: 44,
-        width: 50,
-        height: 28
+        x: -20,
+        y: 20,
+        width: 36,
+        height: 20
       }
       hitSplat.drawRect(rect.x, rect.y, rect.width, rect.height)
       const splatTextStyle = {
         fill: damage.critical ? 'white' : '#ddd',
-        fontSize: damage.critical ? '30px' : '20px',
+        fontSize: damage.critical ? '24px' : '20px',
         boundsAlignH: 'center'
       }
-      const hitText = game.make.text(-10, 41, damageString, splatTextStyle)
-      hitText.setTextBounds(-30, damage.critical ? 0 : 6, 80, 30)
+      const hitText = game.make.text(-10, rect.y - 3, damageString, splatTextStyle)
+      hitText.setTextBounds(-30, damage.critical ? 0 : 3, 80, 30)
 
       hitSplat.addChild(hitText)
       victim.addChild(hitSplat)
@@ -332,6 +344,7 @@ window.onload = function () {
           gameStatusText.text = 'chest reached'
           game.paused = true
         } else {
+          players.state = 'walking'
           movePersons('player')
         }
       }
