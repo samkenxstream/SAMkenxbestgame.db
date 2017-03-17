@@ -7,8 +7,8 @@ window.onload = function () {
 
   const PERSON_MOVEMENT_VELOCITY = 80
   const PERSON_WIDTH = 61
-  const PLAYER_MAX_HEALTH = 23
-  const ENEMY_MAX_HEALTH = 9 // 17
+  const PLAYER_MAX_HEALTH = 24
+  const ENEMY_MAX_HEALTH = 18 // 17
   const COMBAT_DISTANCE = 28
 
   const game = new Phaser.Game(gameWidth, gameHeight, Phaser.AUTO, '', {
@@ -72,7 +72,7 @@ window.onload = function () {
     game.physics.arcade.enable(fighter)
     fighter.body.collideWorldBounds = true
     fighter.body.gravity.y = 700
-    fighter.maxHealth = maxHealth || ENEMY_MAX_HEALTH
+    fighter.maxHealth = maxHealth
     fighter.health = fighter.maxHealth
 
     fighter.placesFromFront = placesFromFront
@@ -107,7 +107,6 @@ window.onload = function () {
     players.sprites[1] = createFighter('player', game.world.centerX - game.width / 6 - (PERSON_WIDTH + distBetweenFighters), game.world.centerY, PLAYER_MAX_HEALTH, 1)
     players.sprites[2] = createFighter('player', game.world.centerX - game.width / 6 - 2 * (PERSON_WIDTH + distBetweenFighters), game.world.centerY, PLAYER_MAX_HEALTH, 2)
     players.count = 3
-    players.sprites[0].damage(5)
 
     enemies.sprites[0] = createFighter('enemy', game.world.centerX + COMBAT_DISTANCE, game.world.centerY, ENEMY_MAX_HEALTH, 0)
     enemies.sprites[1] = createFighter('enemy', game.world.centerX + COMBAT_DISTANCE + PERSON_WIDTH + distBetweenFighters, game.world.centerY, ENEMY_MAX_HEALTH, 1)
@@ -135,7 +134,8 @@ window.onload = function () {
 
     players.state = 'swapping'
 
-    const playerAtFrontX = players.getFirstAliveUnit().x
+    const playerAtFront = players.getFirstAliveUnit()
+    const playerAtFrontX = playerAtFront.x
 
     let playersToShift = players.getAllAliveUnits().filter(player => player.placesFromFront <= placesFromFront)
     playersToShift.sort((playerA, playerB) => {
@@ -152,11 +152,11 @@ window.onload = function () {
 
     playerToPush.x = playerAtFrontX // move the player to the front
     playerToPush.placesFromFront = 0 // move the player to the front
-    console.info('push x: from, to', playerToPush.x, playerAtFrontX)
-    players.frontIndex = playerToPushIndex
+    // the player being pushed to the front needs to wait to attack
+    // this prevents a player from spam swapping their heroes to attack with each as often as possible
+    playerToPush.combat.attackTimer = playerAtFront.combat.attackTimer
 
-    // add handling in the update loop, to use xDirection
-    // remember to set xDirection to null, once the player is in position
+    players.frontIndex = playerToPushIndex
   }
 
   function update () {
