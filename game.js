@@ -7,8 +7,8 @@ window.onload = function () {
 
   const PERSON_MOVEMENT_VELOCITY = 80
   const PERSON_WIDTH = 61
-  const PLAYER_MAX_HEALTH = 24
-  const ENEMY_MAX_HEALTH = 18 // 17
+  const PLAYER_MAX_HEALTH = 36
+  const ENEMY_MAX_HEALTH = 22 // 17
   const COMBAT_DISTANCE = 28
 
   const game = new Phaser.Game(gameWidth, gameHeight, Phaser.AUTO, '', {
@@ -87,9 +87,14 @@ window.onload = function () {
     // fighter.addChild(HealthBar(game, {x, y: y - 15, width: 60, height: 10}))
 
     fighter.combat = {
-      attackSpeed: 1.5,
-      attackDamage: 6,
-      attackTimer: 0
+      attackSpeed: 1.0,
+      minHitDamage: 5,
+      averageHitDamage: 6,
+      maxHitDamage: 10,
+      attackTimer: 0,
+      get hitDamage () {
+        return Math.ceil(this.minHitDamage + (this.maxHitDamage - this.minHitDamage) * Math.random())
+      }
     }
     fighter.events.onKilled.add(() => fighter.healthBar.kill())
 
@@ -144,7 +149,6 @@ window.onload = function () {
 
     playersToShift.reduce((previousPlayerX, player) => {
       const originalX = player.x
-      console.info('x: from, to', originalX, previousPlayerX)
       player.x = previousPlayerX
       player.placesFromFront++
       return originalX
@@ -186,8 +190,36 @@ window.onload = function () {
     }
 
     function attackPerson (attacker, victim) {
+      // attack animation
       attacker.body.velocity.y = -150
-      victim.damage(attacker.combat.attackDamage)
+
+      // damage the victim
+      const damage = attacker.combat.hitDamage
+      victim.damage(damage)
+
+      // render a hit splat
+      const hitSplat = game.add.graphics()
+      hitSplat.beginFill(0xba0c0c, 1)
+      hitSplat.lineStyle(3, 0x6d0808, 0.8)
+      const rect = {
+        x: -26,
+        y: 44,
+        width: 50,
+        height: 28
+      }
+      hitSplat.drawRect(rect.x, rect.y, rect.width, rect.height)
+      const splatTextStyle = {
+        fill: 'white',
+        fontSize: '30px',
+        boundsAlignH: 'center'
+      }
+      const hitText = game.make.text(-10, 41, damage.toString(), splatTextStyle)
+      hitText.setTextBounds(-30, 0, 80, 30)
+
+      hitSplat.addChild(hitText)
+      victim.addChild(hitSplat)
+      setTimeout(() => { hitSplat.destroy(true) }, (1000 / attacker.combat.attackSpeed) - 300)
+
       // update healthbar
       victim.healthBar.setPercent(victim.health / victim.maxHealth * 100)
 
@@ -240,8 +272,7 @@ window.onload = function () {
     if (firstPlayer) {
       forEachAlivePerson('player', updatePerson)
     } else {
-      gameStatusText.text = 'all players dead'
-      console.info('you lose')
+      gameStatusText.text = 'all heroes dead'
       game.paused = true
     }
 
