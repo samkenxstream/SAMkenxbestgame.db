@@ -44,7 +44,7 @@ window.onload = function () {
   const HERO_WIDTH = 60
 
   const PLAYER_MAX_HEALTH = 62
-  const ENEMY_MAX_HEALTH = 50
+  const ENEMY_MAX_HEALTH = 62
 
   const DISTANCE_BETWEEN_FIGHTERS = HERO_WIDTH + 12
   const COMBAT_DISTANCE = 28
@@ -56,10 +56,6 @@ window.onload = function () {
   })
 
   const getFirstAliveUnit = function () {
-/*    const frontSprite = this.sprites[this.frontIndex]
-    if (frontSprite.alive && frontSprite.placesFromFront === 0) {
-      return frontSprite
-    }*/
     const aliveSprites = this.getAllAliveUnits()
     const frontAliveSprite = aliveSprites.reduce((mostFrontSprite, sprite) => {
       if (sprite.placesFromFront < mostFrontSprite.placesFromFront) {
@@ -76,9 +72,9 @@ window.onload = function () {
 
   let players = {
     sprites: [
+      'knight',
       'archer',
       'archer',
-      'archer'
     ],
     frontIndex: 0, // index of the player at the front, ready to attack
     state: 'idle', // 'idle', walking', 'fighting', swapping'
@@ -90,8 +86,8 @@ window.onload = function () {
   let enemies = {
     sprites: [
       'archer',
-      'archer',
-      'archer'
+      'knight',
+      'knight',
     ],
     frontIndex: 0, // index of the player at the front, ready to attack
     getAllAliveUnits,
@@ -100,7 +96,8 @@ window.onload = function () {
 
   let chest,
     playersStateText,
-    gameStatusText
+    gameStatusText,
+    projectiles
 
   function preload () {
     game.load.image('background', 'images/background1.png')
@@ -109,6 +106,8 @@ window.onload = function () {
     game.load.image('knight_blue', 'images/characters/knight_blue_60x57.png')
     game.load.image('archer_blue', 'images/characters/archer_blue_60x60.png')
     game.load.image('archer_orange', 'images/characters/archer_orange_60x60.png')
+
+    game.load.image('arrow', 'images/particles/arrow.png')
 
     game.load.image('chest_closed', 'images/chest_closed.png')
     game.load.image('chest_open', 'images/chest_open.png')
@@ -119,13 +118,16 @@ window.onload = function () {
     // numFromFront is the number
     let fighter
     let spriteSuffix
+    let xDirection
     let flipHorizontally = false
 
     if (type === 'player') {
       spriteSuffix = '_blue'
+      xDirection = 1
       flipHorizontally = true
     } else if (type === 'enemy') {
       spriteSuffix = '_orange'
+      xDirection = -1
     }
     switch (fighterClass) {
       case 'knight':
@@ -142,16 +144,19 @@ window.onload = function () {
 
     fighter.info = {
       type,
-      fighterClass
+      fighterClass,
+      xDirection
     }
 
     fighter.anchor.setTo(0.5, 0)
     fighter.inputEnabled = true
     fighter.input.useHandCursor = placesFromFront > 0
 
+    // Physics
     game.physics.arcade.enable(fighter)
     fighter.body.collideWorldBounds = true
     fighter.body.gravity.y = 700
+
     fighter.maxHealth = maxHealth
     fighter.health = fighter.maxHealth
 
@@ -200,6 +205,8 @@ window.onload = function () {
   }
 
   function create () {
+    game.physics.startSystem(Phaser.Physics.ARCADE);
+
     game.time.advancedTiming = true
     game.add.sprite(0, 0, 'background')
     playersStateText = game.add.text(0, 0, 'playersStateText')
@@ -228,6 +235,19 @@ window.onload = function () {
       maxHealth: ENEMY_MAX_HEALTH,
       placesFromFront: index
     }))
+
+    projectiles = game.add.group()
+    projectiles.enableBody = true
+    projectiles.physicsBodyType = Phaser.Physics.ARCADE
+
+    projectiles.createMultiple(50, 'arrow')
+    projectiles.setAll('checkWorldBounds', true)
+    projectiles.setAll('scale.x', 0.5)
+    projectiles.setAll('scale.y', 0.5)
+    projectiles.setAll('angle', -44)
+    projectiles.setAll('anchor.x', 1)
+    projectiles.setAll('anchor.y', 1)
+    projectiles.setAll('outOfBoundsKill', true)
 
     chest = game.add.sprite(game.world.right - 130, game.world.height - 95, 'chest_closed')
   }
@@ -277,6 +297,10 @@ window.onload = function () {
   function update () {
     const cursors = game.input.keyboard.createCursorKeys()
     playersStateText.text = players.state
+
+    game.physics.arcade.overlap(enemies.sprites, projectiles, projectileHitsEnemy, null, this)
+    game.physics.arcade.overlap(players.sprites, projectiles, projectileHitsPlayer, null, this)
+
     function forEachAliveHero (heroType, execute, frontToBack = false) {
       let heroes
       if (heroType instanceof Array) {
@@ -305,11 +329,65 @@ window.onload = function () {
       return Math.floor(distBetweenCenters - (Math.abs(body1.width) / 2) - (Math.abs(body2.width) / 2))
     }
 
-    function attackHero (attacker, victim) {
-      // attack animation
-      attacker.body.velocity.y = -150
+    function projectileHitsEnemy (enemy, projectile) {
+      if (projectile.info.team === 'player') {
+        // projectile is hitting an enemy
+        dealDamage(projectile.shooter, enemy)
+        projectile.kill()
+      } else {
+        // friendly fire!
+      }
+    }
+    function projectileHitsPlayer (player, projectile) {
+      if (projectile.info.team === 'enemy') {
+        // projectile is hitting a player
+        dealDamage(projectile.shooter, player)
+        projectile.kill()
+      } else {
+        // friendly fire!
+      }
+    }
 
+    function shoot (shooter, xDirection, projectileType = 'arrow') {
+      // if (shooter.info.type !== 'enemy') return
+      // console.info(shooter.info.type, shooter.info.fighterClass, 'shoots', projectile, xDirection)
+      const projectile = projectiles.getFirstDead()
+      let projectileX = shooter.x + 18 * xDirection
+      projectile.angle += 180;
+      if (xDirection < 0) {
+        projectile.angle -= 180;
+        projectileX -= projectile.width
+      }
+      projectile.reset(projectileX, shooter.y + 22)
+      projectile.body.velocity.x = 460 * xDirection
+      projectile.body.gravity.y = 230
+      projectile.body.acceleration.x = -140 * xDirection
+      projectile.shooter = shooter
+      projectile.info = {
+        team: shooter.info.type,
+        projectileType: projectileType
+      }
+    }
+
+    function attackHero (attacker, victim) {
+      switch (attacker.info.fighterClass) {
+        case 'knight':
+          // attack animation
+          attacker.body.velocity.y = -130
+          dealDamage(attacker, victim)
+          break
+        case 'archer':
+          shoot(attacker, attacker.info.xDirection)
+          break
+      }
       // damage the victim
+
+      // delay until next attack
+      const fps = game.time.fps === 1 ? 60 : game.time.fps
+      attacker.combat.attackTimer = fps / attacker.combat.attackSpeed
+    }
+
+    function dealDamage (attacker, victim) {
       const damage = attacker.combat.hitDamage
       const damageValue = damage.value
       const damageString = damage.critical ? damageValue.toString() + '!' : damageValue.toString()
@@ -350,9 +428,6 @@ window.onload = function () {
 
       // update healthbar
       victim.healthBar.setPercent(victim.health / victim.maxHealth * 100)
-
-      const fps = game.time.fps === 1 ? 60 : game.time.fps
-      attacker.combat.attackTimer = fps / attacker.combat.attackSpeed
     }
 
     function moveHeroes (type) {
@@ -460,7 +535,7 @@ window.onload = function () {
           chest.loadTexture('chest_open')
           chest.anchor.setTo(0.1, 0.3)
 
-          gameStatusText.text = 'chest reached'
+          gameStatusText.text = '$ $ $ $ $ $ $ $'
           game.paused = true
         } else {
           players.state = 'walking'
