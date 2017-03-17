@@ -127,7 +127,6 @@ window.onload = function () {
 
   /* @PARAM {number} placesFromFront the number of places the unit clicked on is from the front of their team */
   function pushPlayerToFront (placesFromFront) {
-    console.info('player at posi', placesFromFront)
     if (players.count === 1) {
       console.info('one player, no need to swap')
       return

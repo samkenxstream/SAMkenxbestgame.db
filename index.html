@@ -7,10 +7,22 @@
     body {
       background-color: '#fcfcfc';
     }
+    div.btc {
+      display: flex;
+      justify-content: center;
+      margin: 5px;
+      padding: 0;
+    }
+    button {
+      height: 50px;
+      width: 120px;
+    }
   </style>
 </head>
 <body>
-
+  <div class="btc">
+    <button onclick="window.location.reload()">Refresh page</button>
+  </div>
   <script src="phaser.min.js"></script>
   <script src="plugins/HealthBar.standalone.js"></script>
   <script src="game.js"></script>
