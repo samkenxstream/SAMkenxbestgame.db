@@ -10,6 +10,10 @@ const COLORS = {
       archer: {
         fill: 0x0c0ccb,
         stroke: 0x0c0c94
+      },
+      default: {
+        fillCritical: 0x111111,
+        strokeCritical: 0x000000
       }
     }
   },
@@ -20,8 +24,12 @@ const COLORS = {
         stroke: 0x740606
       },
       archer: {
-        fill: 0x0cba0c,
-        stroke: 0xba0c0c
+        fill: 0x0c0ccb,
+        stroke: 0x0c0c94
+      },
+      default: {
+        fillCritical: 0x111111,
+        strokeCritical: 0x000000
       }
     }
   }
@@ -35,17 +43,16 @@ window.onload = function () {
   const PERSON_MOVEMENT_VELOCITY = 80
   const PERSON_WIDTH = 60
 
-  const NUM_ENEMIES = 3
   const PLAYER_MAX_HEALTH = 120
-  const ENEMY_MAX_HEALTH = 10 // 17
+  const ENEMY_MAX_HEALTH = 100 // 17
 
   const DISTANCE_BETWEEN_FIGHTERS = PERSON_WIDTH + 12
   const COMBAT_DISTANCE = 28
 
   const game = new Phaser.Game(gameWidth, gameHeight, Phaser.AUTO, '', {
-    preload: preload,
-    create: create,
-    update: update
+    preload,
+    create,
+    update
   })
 
   const getFirstAliveUnit = function () {
@@ -69,7 +76,7 @@ window.onload = function () {
 
   let players = {
     sprites: [
-      'knight',
+      'archer',
       'archer',
       'archer'
     ],
@@ -81,7 +88,11 @@ window.onload = function () {
   }
 
   let enemies = {
-    sprites: new Array(NUM_ENEMIES).fill('knight'),
+    sprites: [
+      'archer',
+      'archer',
+      'archer'
+    ],
     frontIndex: 0, // index of the player at the front, ready to attack
     getAllAliveUnits,
     getFirstAliveUnit
@@ -266,10 +277,15 @@ window.onload = function () {
   function update () {
     const cursors = game.input.keyboard.createCursorKeys()
     playersStateText.text = players.state
-    function forEachAlivePerson (type, execute, frontToBack = false) {
+    function forEachAlivePerson (heroType, execute, frontToBack = false) {
       let persons
-      if (type === 'player') persons = players.sprites
-      if (type === 'enemy') persons = enemies.sprites
+      if (heroType instanceof Array) {
+        persons = heroType
+      } else if (heroType === 'player') {
+        persons = players.sprites
+      } else if (heroType === 'enemy') {
+        persons = enemies.sprites
+      }
 
       const alivePersons = persons.filter(person => person.alive)
       alivePersons.sort((playerA, playerB) => {
@@ -286,7 +302,7 @@ window.onload = function () {
 
     function distanceBetweenBounds (body1, body2) {
       const distBetweenCenters = game.physics.arcade.distanceBetween(body1, body2)
-      return distBetweenCenters - (Math.abs(body1.width) / 2) - (Math.abs(body2.width) / 2)
+      return Math.floor(distBetweenCenters - (Math.abs(body1.width) / 2) - (Math.abs(body2.width) / 2))
     }
 
     function attackPerson (attacker, victim) {
@@ -301,18 +317,24 @@ window.onload = function () {
 
       // render a hit splat
       const hitSplat = game.add.graphics()
+
       const splatColors = COLORS[attacker.info.type].hitSplat[attacker.info.fighterClass]
-      hitSplat.beginFill(splatColors.fill, 1)
-      hitSplat.lineStyle(3, splatColors.stroke, 1)
+      const defaultSplatColors = COLORS[attacker.info.type].hitSplat.default
+      const fillColor = damage.critical ? defaultSplatColors.fillCritical : splatColors.fill
+      const lineColor = damage.critical ? defaultSplatColors.strokeCritical : splatColors.stroke
+      hitSplat.beginFill(fillColor, 1)
+      hitSplat.lineStyle(3, lineColor, 1)
+
       const rect = {
         x: -20,
-        y: 20,
+        y: damage.critical ? 21 : 20,
         width: 36,
         height: 20
       }
       hitSplat.drawRect(rect.x, rect.y, rect.width, rect.height)
+
       const splatTextStyle = {
-        fill: damage.critical ? 'white' : '#ddd',
+        fill: 'white',
         fontSize: damage.critical ? '24px' : '20px',
         boundsAlignH: 'center'
       }
@@ -374,11 +396,13 @@ window.onload = function () {
       hero.body.velocity.x = 0
       hero.healthBar.setPosition(hero.x, hero.y - 14)
       hero.placesFromFront = index
-      gameStatusText.text = `${hero.info.fighterClass} at ${hero.placesFromFront}`
+      if (hero.info.type === 'player') {
+        gameStatusText.text = `${hero.info.fighterClass} at ${hero.placesFromFront}`
+      }
     }
 
     if (firstPlayer) {
-      forEachAlivePerson('player', updatePerson, true)
+      forEachAlivePerson(players.sprites, updatePerson, true)
     } else {
       gameStatusText.text = 'all heroes dead'
       game.paused = true
@@ -403,18 +427,26 @@ window.onload = function () {
         // the first player and first enemy attack each other
         players.state = 'fighting'
         // first player and enemy attack
-        if (firstPlayer.combat.attackTimer <= 0) {
+/*        if (firstPlayer.combat.attackTimer <= 0) {
           attackPerson(firstPlayer, firstEnemy)
         }
         if (firstEnemy.combat.attackTimer <= 0) {
           attackPerson(firstEnemy, firstPlayer)
-        }
-        // archers attack
+        }*/
+        // all heroes attack
         forEachAlivePerson('player', (hero, index) => {
           if (hero.placesFromFront <= hero.combat.range) {
             // this hero can attack from a distance
             if (hero.combat.attackTimer <= 0) {
               attackPerson(hero, firstEnemy)
+            }
+          }
+        }, true)
+        forEachAlivePerson('enemy', (hero, index) => {
+          if (hero.placesFromFront <= hero.combat.range) {
+            // this hero is in range to attack
+            if (hero.combat.attackTimer <= 0) {
+              attackPerson(hero, firstPlayer)
             }
           }
         }, true)
