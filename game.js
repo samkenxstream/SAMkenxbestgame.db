@@ -8,7 +8,8 @@ window.onload = function () {
   const PERSON_MOVEMENT_VELOCITY = 80
   const PERSON_WIDTH = 60
 
-  const PLAYER_MAX_HEALTH = 36
+  const NUM_ENEMIES = 3
+  const PLAYER_MAX_HEALTH = 38
   const ENEMY_MAX_HEALTH = 22 // 17
 
   const DISTANCE_BETWEEN_FIGHTERS = PERSON_WIDTH + 12
@@ -40,7 +41,11 @@ window.onload = function () {
   }
 
   let players = {
-    sprites: [],
+    sprites: [
+      'knight',
+      'archer',
+      'knight'
+    ],
     frontIndex: 0, // index of the player at the front, ready to attack
     state: 'idle', // 'idle', walking', 'fighting', swapping'
     count: 0,
@@ -49,7 +54,7 @@ window.onload = function () {
   }
 
   let enemies = {
-    sprites: [],
+    sprites: new Array(NUM_ENEMIES).fill('knight'),
     frontIndex: 0, // index of the player at the front, ready to attack
     getAllAliveUnits,
     getFirstAliveUnit
@@ -61,9 +66,12 @@ window.onload = function () {
 
   function preload () {
     game.load.image('background', 'images/background1.png')
-    game.load.image('person', 'images/stickman_small.png')
+
     game.load.image('knight_orange', 'images/characters/knight_orange_60x57.png')
     game.load.image('knight_blue', 'images/characters/knight_blue_60x57.png')
+    game.load.image('archer_blue', 'images/characters/archer_blue_60x60.png')
+    game.load.image('archer_orange', 'images/characters/archer_orange_60x60.png')
+
     game.load.image('chest_closed', 'images/chest_closed.png')
     game.load.image('chest_open', 'images/chest_open.png')
     game.load.image('chest_closed', 'images/chest_closed.png')
@@ -72,14 +80,26 @@ window.onload = function () {
   function createFighter ({type, fighterClass, x, y, maxHealth, placesFromFront}) {
     // numFromFront is the number
     let fighter
-    switch (type) {
-      case 'player':
-        fighter = game.add.sprite(x, y, 'knight_blue')
-        fighter.scale.x *= -1
+    let spriteSuffix
+    let flipHorizontally = false
+
+    if (type === 'player') {
+      spriteSuffix = '_blue'
+      flipHorizontally = true
+    } else if (type === 'enemy') {
+      spriteSuffix = '_orange'
+    }
+    switch (fighterClass) {
+      case 'knight':
+        fighter = game.add.sprite(x, y, 'knight' + spriteSuffix)
         break
-      case 'enemy':
-        fighter = game.add.sprite(x, y, 'knight_orange')
+      case 'archer':
+        fighter = game.add.sprite(x, y, 'archer' + spriteSuffix)
         break
+    }
+
+    if (flipHorizontally) {
+      fighter.scale.x *= -1
     }
 
     fighter.info = {
@@ -146,42 +166,29 @@ window.onload = function () {
     playersStateText = game.add.text(0, 0, 'playersStateText')
     gameStatusText = game.add.text(game.world.right - 220, 0, 'gameStatusText')
 
-    
     const UNIT_HEIGHT = 60
-    players.sprites[0] = createFighter({
+
+    const playerBaseX = game.world.centerX - (PERSON_WIDTH / 2 + COMBAT_DISTANCE / 2)
+    players.sprites = players.sprites.map((fighterClass, index) => createFighter({
       type: 'player',
-      x: game.world.centerX - (PERSON_WIDTH / 2 + COMBAT_DISTANCE / 2),
+      fighterClass,
+      x: playerBaseX - DISTANCE_BETWEEN_FIGHTERS * index,
       y: game.world.bottom - UNIT_HEIGHT,
       maxHealth: PLAYER_MAX_HEALTH,
-      placesFromFront: 0
-    })
-    // players.sprites[0] = createFighter('player', , , , 0)
-    // players.sprites[1] = createFighter('player', game.world.centerX - game.width / 6 - (PERSON_WIDTH + DISTANCE_BETWEEN_FIGHTERS), game.world.bottom - UNIT_HEIGHT, PLAYER_MAX_HEALTH, 1)
-    // players.sprites[2] = createFighter('player', game.world.centerX - game.width / 6 - 2 * (PERSON_WIDTH + DISTANCE_BETWEEN_FIGHTERS), game.world.bottom - UNIT_HEIGHT, PLAYER_MAX_HEALTH, 2)
-    players.count = 1
+      placesFromFront: index
+    }))
+
+    players.count = players.sprites.filter(player => player)
 
     const enemyBaseX = game.world.centerX + (PERSON_WIDTH / 2 + COMBAT_DISTANCE / 2)
-    enemies.sprites[0] = createFighter({
+    enemies.sprites = enemies.sprites.map((fighterClass, index) => createFighter({
       type: 'enemy',
-      x: enemyBaseX,
+      fighterClass,
+      x: enemyBaseX + DISTANCE_BETWEEN_FIGHTERS * index,
       y: game.world.bottom - UNIT_HEIGHT,
       maxHealth: ENEMY_MAX_HEALTH,
-      placesFromFront: 0
-    })
-    enemies.sprites[1] = createFighter({
-      type: 'enemy',
-      x: enemyBaseX + DISTANCE_BETWEEN_FIGHTERS * 1,
-      y: game.world.bottom - UNIT_HEIGHT,
-      maxHealth: ENEMY_MAX_HEALTH,
-      placesFromFront: 1
-    })
-    enemies.sprites[2] = createFighter({
-      type: 'enemy',
-      x: enemyBaseX + DISTANCE_BETWEEN_FIGHTERS * 2,
-      y: game.world.bottom - UNIT_HEIGHT,
-      maxHealth: ENEMY_MAX_HEALTH,
-      placesFromFront: 1
-    })
+      placesFromFront: index
+    }))
 
     chest = game.add.sprite(game.world.right - 130, game.world.bottom - 95, 'chest_closed')
   }
