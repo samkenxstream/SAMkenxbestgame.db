@@ -1,16 +1,43 @@
 /* global Phaser, HealthBar */
 // Phaser version 2.6.2 - "Kore Springs"
+const COLORS = {
+  player: {
+    hitSplat: {
+      knight: {
+        fill: 0xba0c0c,
+        stroke: 0x740606
+      },
+      archer: {
+        fill: 0x0c0ccb,
+        stroke: 0x0c0c94
+      }
+    }
+  },
+  enemy: {
+    hitSplat: {
+      knight: {
+        fill: 0xba0c0c,
+        stroke: 0x740606
+      },
+      archer: {
+        fill: 0x0cba0c,
+        stroke: 0xba0c0c
+      }
+    }
+  }
+}
+
 window.onload = function () {
   const TwitchWidth = 847
   const gameWidth = TwitchWidth
-  const gameHeight = 220
+  const gameHeight = 160
 
   const PERSON_MOVEMENT_VELOCITY = 80
   const PERSON_WIDTH = 60
 
   const NUM_ENEMIES = 3
-  const PLAYER_MAX_HEALTH = 38
-  const ENEMY_MAX_HEALTH = 22 // 17
+  const PLAYER_MAX_HEALTH = 120
+  const ENEMY_MAX_HEALTH = 10 // 17
 
   const DISTANCE_BETWEEN_FIGHTERS = PERSON_WIDTH + 12
   const COMBAT_DISTANCE = 28
@@ -44,7 +71,7 @@ window.onload = function () {
     sprites: [
       'knight',
       'archer',
-      'knight'
+      'archer'
     ],
     frontIndex: 0, // index of the player at the front, ready to attack
     state: 'idle', // 'idle', walking', 'fighting', swapping'
@@ -142,6 +169,7 @@ window.onload = function () {
 
     fighter.combat = {
       attackTimer: 0,
+      range: (fighterClass === 'archer') ? 1 : 0,
       attackSpeed: 1.0,
       minHitDamage: 3,
       maxHitDamage: 6,
@@ -173,7 +201,7 @@ window.onload = function () {
       type: 'player',
       fighterClass,
       x: playerBaseX - DISTANCE_BETWEEN_FIGHTERS * index,
-      y: game.world.bottom - UNIT_HEIGHT,
+      y: game.world.height - UNIT_HEIGHT,
       maxHealth: PLAYER_MAX_HEALTH,
       placesFromFront: index
     }))
@@ -185,12 +213,12 @@ window.onload = function () {
       type: 'enemy',
       fighterClass,
       x: enemyBaseX + DISTANCE_BETWEEN_FIGHTERS * index,
-      y: game.world.bottom - UNIT_HEIGHT,
+      y: game.world.height - UNIT_HEIGHT,
       maxHealth: ENEMY_MAX_HEALTH,
       placesFromFront: index
     }))
 
-    chest = game.add.sprite(game.world.right - 130, game.world.bottom - 95, 'chest_closed')
+    chest = game.add.sprite(game.world.right - 130, game.world.height - 95, 'chest_closed')
   }
 
   /* @PARAM {number} placesFromFront the number of places the unit clicked on is from the front of their team */
@@ -238,13 +266,19 @@ window.onload = function () {
   function update () {
     const cursors = game.input.keyboard.createCursorKeys()
     playersStateText.text = players.state
-    function forEachAlivePerson (type, execute) {
+    function forEachAlivePerson (type, execute, frontToBack = false) {
       let persons
       if (type === 'player') persons = players.sprites
       if (type === 'enemy') persons = enemies.sprites
 
       const alivePersons = persons.filter(person => person.alive)
+      alivePersons.sort((playerA, playerB) => {
+        return playerB.placesFromFront - playerA.placesFromFront
+      })
 
+      if (frontToBack) {
+        alivePersons.reverse()
+      }
       alivePersons.forEach((person, index) => {
         execute(person, index)
       })
@@ -267,8 +301,9 @@ window.onload = function () {
 
       // render a hit splat
       const hitSplat = game.add.graphics()
-      hitSplat.beginFill(0xba0c0c, 1)
-      hitSplat.lineStyle(3, 0x6d0808, 0.8)
+      const splatColors = COLORS[attacker.info.type].hitSplat[attacker.info.fighterClass]
+      hitSplat.beginFill(splatColors.fill, 1)
+      hitSplat.lineStyle(3, splatColors.stroke, 1)
       const rect = {
         x: -20,
         y: 20,
@@ -334,14 +369,16 @@ window.onload = function () {
     const firstPlayer = players.getFirstAliveUnit()
     const firstEnemy = enemies.getFirstAliveUnit()
 
-    const updatePerson = person => {
-      person.combat.attackTimer--
-      person.body.velocity.x = 0
-      person.healthBar.setPosition(person.x, person.y - 14)
+    const updatePerson = (hero, index) => {
+      hero.combat.attackTimer--
+      hero.body.velocity.x = 0
+      hero.healthBar.setPosition(hero.x, hero.y - 14)
+      hero.placesFromFront = index
+      gameStatusText.text = `${hero.info.fighterClass} at ${hero.placesFromFront}`
     }
 
     if (firstPlayer) {
-      forEachAlivePerson('player', updatePerson)
+      forEachAlivePerson('player', updatePerson, true)
     } else {
       gameStatusText.text = 'all heroes dead'
       game.paused = true
@@ -350,10 +387,10 @@ window.onload = function () {
 
     if (firstEnemy) {
       gameStatusText.text = '1+ enemies alive'
-      forEachAlivePerson('enemy', updatePerson)
+      forEachAlivePerson('enemy', updatePerson, true)
 
       if (distanceToMiddle(firstEnemy) > COMBAT_DISTANCE / 2) {
-        gameStatusText.text = 'enemies walking'
+        gameStatusText.text = 'walking'
         movePersons('enemy')
       }
       if (distanceToMiddle(firstPlayer) > COMBAT_DISTANCE / 2) {
@@ -362,20 +399,30 @@ window.onload = function () {
       }
 
       if (distanceBetweenBounds(firstPlayer, firstEnemy) <= COMBAT_DISTANCE) {
-        // players.sprites and enemies.sprites are close, so they attack
+        // heroes are in combat range
         // the first player and first enemy attack each other
         players.state = 'fighting'
+        // first player and enemy attack
         if (firstPlayer.combat.attackTimer <= 0) {
           attackPerson(firstPlayer, firstEnemy)
         }
         if (firstEnemy.combat.attackTimer <= 0) {
           attackPerson(firstEnemy, firstPlayer)
         }
+        // archers attack
+        forEachAlivePerson('player', (hero, index) => {
+          if (hero.placesFromFront <= hero.combat.range) {
+            // this hero can attack from a distance
+            if (hero.combat.attackTimer <= 0) {
+              attackPerson(hero, firstEnemy)
+            }
+          }
+        }, true)
       }
     } else {
       gameStatusText.text = 'no enemies'
       // no enemies, continue moving through the level
-      if (Math.abs(firstPlayer.bottom - game.world.bottom) < 2) {
+      if (Math.abs(firstPlayer.bottom - game.world.height) < 2) {
         // first player is on ground
         if (isOverlapping(firstPlayer, chest)) {
           chest.loadTexture('chest_open')
