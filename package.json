@@ -1,6 +1,6 @@
 {
   "name": "gacha4good",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Players collect streamers to fight for them against the evil twitch emotes",
   "main": "game.js",
   "scripts": {
