@@ -6,9 +6,12 @@ window.onload = function () {
   const gameHeight = 220
 
   const PERSON_MOVEMENT_VELOCITY = 80
-  const PERSON_WIDTH = 61
+  const PERSON_WIDTH = 60
+
   const PLAYER_MAX_HEALTH = 36
   const ENEMY_MAX_HEALTH = 22 // 17
+
+  const DISTANCE_BETWEEN_FIGHTERS = PERSON_WIDTH + 12
   const COMBAT_DISTANCE = 28
 
   const game = new Phaser.Game(gameWidth, gameHeight, Phaser.AUTO, '', {
@@ -66,16 +69,22 @@ window.onload = function () {
     game.load.image('chest_closed', 'images/chest_closed.png')
   }
 
-  function createFighter (type, x, y, maxHealth, placesFromFront) {
+  function createFighter ({type, fighterClass, x, y, maxHealth, placesFromFront}) {
     // numFromFront is the number
     let fighter
     switch (type) {
       case 'player':
         fighter = game.add.sprite(x, y, 'knight_blue')
+        fighter.scale.x *= -1
         break
       case 'enemy':
         fighter = game.add.sprite(x, y, 'knight_orange')
         break
+    }
+
+    fighter.info = {
+      type,
+      fighterClass
     }
 
     fighter.anchor.setTo(0.5, 0)
@@ -108,7 +117,7 @@ window.onload = function () {
       fighter.inputEnabled = true
       fighter.events.onInputDown.add(() => pushPlayerToFront(fighter.placesFromFront))
     }
-    fighter.healthBar = new HealthBar(game, {x, y: y - 15, width: 60, height: 10, bar})
+    fighter.healthBar = new HealthBar(game, {x: x - 4, y: y - 15, width: 50, height: 10, bar})
     // fighter.addChild(HealthBar(game, {x, y: y - 15, width: 60, height: 10}))
 
     fighter.combat = {
@@ -137,16 +146,42 @@ window.onload = function () {
     playersStateText = game.add.text(0, 0, 'playersStateText')
     gameStatusText = game.add.text(game.world.right - 220, 0, 'gameStatusText')
 
-    const distBetweenFighters = 15
+    
     const UNIT_HEIGHT = 60
-    players.sprites[0] = createFighter('player', game.world.centerX - game.width / 6, game.world.bottom - UNIT_HEIGHT, PLAYER_MAX_HEALTH, 0)
-    players.sprites[1] = createFighter('player', game.world.centerX - game.width / 6 - (PERSON_WIDTH + distBetweenFighters), game.world.bottom - UNIT_HEIGHT, PLAYER_MAX_HEALTH, 1)
-    players.sprites[2] = createFighter('player', game.world.centerX - game.width / 6 - 2 * (PERSON_WIDTH + distBetweenFighters), game.world.bottom - UNIT_HEIGHT, PLAYER_MAX_HEALTH, 2)
-    players.count = 3
+    players.sprites[0] = createFighter({
+      type: 'player',
+      x: game.world.centerX - (PERSON_WIDTH / 2 + COMBAT_DISTANCE / 2),
+      y: game.world.bottom - UNIT_HEIGHT,
+      maxHealth: PLAYER_MAX_HEALTH,
+      placesFromFront: 0
+    })
+    // players.sprites[0] = createFighter('player', , , , 0)
+    // players.sprites[1] = createFighter('player', game.world.centerX - game.width / 6 - (PERSON_WIDTH + DISTANCE_BETWEEN_FIGHTERS), game.world.bottom - UNIT_HEIGHT, PLAYER_MAX_HEALTH, 1)
+    // players.sprites[2] = createFighter('player', game.world.centerX - game.width / 6 - 2 * (PERSON_WIDTH + DISTANCE_BETWEEN_FIGHTERS), game.world.bottom - UNIT_HEIGHT, PLAYER_MAX_HEALTH, 2)
+    players.count = 1
 
-    enemies.sprites[0] = createFighter('enemy', game.world.centerX + COMBAT_DISTANCE, game.world.bottom - UNIT_HEIGHT, ENEMY_MAX_HEALTH, 0)
-    enemies.sprites[1] = createFighter('enemy', game.world.centerX + COMBAT_DISTANCE + PERSON_WIDTH + distBetweenFighters, game.world.bottom - UNIT_HEIGHT, ENEMY_MAX_HEALTH, 1)
-    enemies.sprites[2] = createFighter('enemy', game.world.centerX + COMBAT_DISTANCE + 2 * (PERSON_WIDTH + distBetweenFighters), game.world.bottom - UNIT_HEIGHT, ENEMY_MAX_HEALTH, 2)
+    const enemyBaseX = game.world.centerX + (PERSON_WIDTH / 2 + COMBAT_DISTANCE / 2)
+    enemies.sprites[0] = createFighter({
+      type: 'enemy',
+      x: enemyBaseX,
+      y: game.world.bottom - UNIT_HEIGHT,
+      maxHealth: ENEMY_MAX_HEALTH,
+      placesFromFront: 0
+    })
+    enemies.sprites[1] = createFighter({
+      type: 'enemy',
+      x: enemyBaseX + DISTANCE_BETWEEN_FIGHTERS * 1,
+      y: game.world.bottom - UNIT_HEIGHT,
+      maxHealth: ENEMY_MAX_HEALTH,
+      placesFromFront: 1
+    })
+    enemies.sprites[2] = createFighter({
+      type: 'enemy',
+      x: enemyBaseX + DISTANCE_BETWEEN_FIGHTERS * 2,
+      y: game.world.bottom - UNIT_HEIGHT,
+      maxHealth: ENEMY_MAX_HEALTH,
+      placesFromFront: 1
+    })
 
     chest = game.add.sprite(game.world.right - 130, game.world.bottom - 95, 'chest_closed')
   }
@@ -201,22 +236,16 @@ window.onload = function () {
       if (type === 'player') persons = players.sprites
       if (type === 'enemy') persons = enemies.sprites
 
-      const aliveArray = [
-        persons[0].alive,
-        persons[1].alive,
-        persons[2].alive
-      ]
+      const alivePersons = persons.filter(person => person.alive)
 
-      aliveArray.forEach((isAlive, index) => {
-        if (isAlive) {
-          execute(persons[index], index)
-        }
+      alivePersons.forEach((person, index) => {
+        execute(person, index)
       })
     }
 
     function distanceBetweenBounds (body1, body2) {
       const distBetweenCenters = game.physics.arcade.distanceBetween(body1, body2)
-      return distBetweenCenters - (body1.width / 2) - (body2.width / 2)
+      return distBetweenCenters - (Math.abs(body1.width) / 2) - (Math.abs(body2.width) / 2)
     }
 
     function attackPerson (attacker, victim) {
@@ -249,6 +278,9 @@ window.onload = function () {
       hitText.setTextBounds(-30, damage.critical ? 0 : 3, 80, 30)
 
       hitSplat.addChild(hitText)
+      if (victim.info.type === 'player') {
+        hitSplat.scale.x *= -1
+      }
       victim.addChild(hitSplat)
       setTimeout(() => { hitSplat.destroy(true) }, (1000 / attacker.combat.attackSpeed) - 300)
 
@@ -298,7 +330,7 @@ window.onload = function () {
     const updatePerson = person => {
       person.combat.attackTimer--
       person.body.velocity.x = 0
-      person.healthBar.setPosition(person.x + 3, person.y - 14)
+      person.healthBar.setPosition(person.x, person.y - 14)
     }
 
     if (firstPlayer) {
@@ -306,6 +338,7 @@ window.onload = function () {
     } else {
       gameStatusText.text = 'all heroes dead'
       game.paused = true
+      return
     }
 
     if (firstEnemy) {
