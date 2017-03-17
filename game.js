@@ -89,8 +89,8 @@ window.onload = function () {
     fighter.combat = {
       attackTimer: 0,
       attackSpeed: 1.0,
-      minHitDamage: 2,
-      maxHitDamage: 5,
+      minHitDamage: 3,
+      maxHitDamage: 6,
       critChance: 0.3,
       get hitDamage () {
         const randomDamage = Math.ceil(this.minHitDamage + (this.maxHitDamage - this.minHitDamage) * Math.random())
@@ -216,12 +216,12 @@ window.onload = function () {
       }
       hitSplat.drawRect(rect.x, rect.y, rect.width, rect.height)
       const splatTextStyle = {
-        fill: 'white',
-        fontSize: '30px',
+        fill: damage.critical ? 'white' : '#ddd',
+        fontSize: damage.critical ? '30px' : '20px',
         boundsAlignH: 'center'
       }
       const hitText = game.make.text(-10, 41, damageString, splatTextStyle)
-      hitText.setTextBounds(-30, 0, 80, 30)
+      hitText.setTextBounds(-30, damage.critical ? 0 : 6, 80, 30)
 
       hitSplat.addChild(hitText)
       victim.addChild(hitSplat)
