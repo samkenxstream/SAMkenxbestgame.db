@@ -87,13 +87,18 @@ window.onload = function () {
     // fighter.addChild(HealthBar(game, {x, y: y - 15, width: 60, height: 10}))
 
     fighter.combat = {
-      attackSpeed: 1.0,
-      minHitDamage: 5,
-      averageHitDamage: 6,
-      maxHitDamage: 10,
       attackTimer: 0,
+      attackSpeed: 1.0,
+      minHitDamage: 2,
+      maxHitDamage: 5,
+      critChance: 0.3,
       get hitDamage () {
-        return Math.ceil(this.minHitDamage + (this.maxHitDamage - this.minHitDamage) * Math.random())
+        const randomDamage = Math.ceil(this.minHitDamage + (this.maxHitDamage - this.minHitDamage) * Math.random())
+        if (Math.random() < this.critChance) {
+          // we got a critical hit!
+          return { value: Math.ceil(this.maxHitDamage * 1.5), critical: true }
+        }
+        return { value: randomDamage, critical: false }
       }
     }
     fighter.events.onKilled.add(() => fighter.healthBar.kill())
@@ -195,7 +200,9 @@ window.onload = function () {
 
       // damage the victim
       const damage = attacker.combat.hitDamage
-      victim.damage(damage)
+      const damageValue = damage.value
+      const damageString = damage.critical ? damageValue.toString() + '!' : damageValue.toString()
+      victim.damage(damageValue)
 
       // render a hit splat
       const hitSplat = game.add.graphics()
@@ -213,7 +220,7 @@ window.onload = function () {
         fontSize: '30px',
         boundsAlignH: 'center'
       }
-      const hitText = game.make.text(-10, 41, damage.toString(), splatTextStyle)
+      const hitText = game.make.text(-10, 41, damageString, splatTextStyle)
       hitText.setTextBounds(-30, 0, 80, 30)
 
       hitSplat.addChild(hitText)
