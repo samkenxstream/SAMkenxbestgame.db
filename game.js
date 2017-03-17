@@ -7,8 +7,8 @@ window.onload = function () {
 
   const PERSON_MOVEMENT_VELOCITY = 80
   const PERSON_WIDTH = 61
-  const PLAYER_MAX_HEALTH = 45
-  const ENEMY_MAX_HEALTH = 1 // 17
+  const PLAYER_MAX_HEALTH = 23
+  const ENEMY_MAX_HEALTH = 9 // 17
   const COMBAT_DISTANCE = 28
 
   const game = new Phaser.Game(gameWidth, gameHeight, Phaser.AUTO, '', {
@@ -17,15 +17,44 @@ window.onload = function () {
     update: update
   })
 
-  let players = []
-
-  let enemies = {
-    1: {},
-    2: {},
-    3: {}
+  const getFirstAliveUnit = function () {
+/*    const frontSprite = this.sprites[this.frontIndex]
+    if (frontSprite.alive && frontSprite.placesFromFront === 0) {
+      return frontSprite
+    }*/
+    const aliveSprites = this.getAllAliveUnits()
+    const frontAliveSprite = aliveSprites.reduce((mostFrontSprite, sprite) => {
+      if (sprite.placesFromFront < mostFrontSprite.placesFromFront) {
+        return sprite
+      }
+      return mostFrontSprite
+    }, aliveSprites[0])
+    return frontAliveSprite
   }
 
-  let chest
+  const getAllAliveUnits = function () {
+    return this.sprites.filter(sprite => sprite.alive)
+  }
+
+  let players = {
+    sprites: [],
+    frontIndex: 0, // index of the player at the front, ready to attack
+    state: 'idle', // 'idle', walking', 'fighting', swapping'
+    count: 0,
+    getAllAliveUnits,
+    getFirstAliveUnit
+  }
+
+  let enemies = {
+    sprites: [],
+    frontIndex: 0, // index of the player at the front, ready to attack
+    getAllAliveUnits,
+    getFirstAliveUnit
+  }
+
+  let chest,
+    playersStateText,
+    gameStatusText
 
   function preload () {
     game.load.image('background', 'images/background1.png')
@@ -35,7 +64,8 @@ window.onload = function () {
     game.load.image('chest_closed', 'images/chest_closed.png')
   }
 
-  function createFighter (type, x, y, maxHealth) {
+  function createFighter (type, x, y, maxHealth, placesFromFront) {
+    // numFromFront is the number
     const fighter = game.add.sprite(x, y, 'person')
     fighter.anchor.setTo(0.5, 0)
 
@@ -45,11 +75,13 @@ window.onload = function () {
     fighter.maxHealth = maxHealth || ENEMY_MAX_HEALTH
     fighter.health = fighter.maxHealth
 
+    fighter.placesFromFront = placesFromFront
+
     let bar = { color: '#ad4805' }
     if (type === 'player') {
       bar = { color: '#48ad05' }
       fighter.inputEnabled = true
-      fighter.events.onInputDown.add(pushPlayerToFront)
+      fighter.events.onInputDown.add(() => pushPlayerToFront(fighter.placesFromFront))
     }
     fighter.healthBar = new HealthBar(game, {x, y: y - 15, width: 60, height: 10, bar})
     // fighter.addChild(HealthBar(game, {x, y: y - 15, width: 60, height: 10}))
@@ -59,45 +91,81 @@ window.onload = function () {
       attackDamage: 6,
       attackTimer: 0
     }
-    fighter.events.onKilled.add(() => fighter.healthBar.kill(), game)
+    fighter.events.onKilled.add(() => fighter.healthBar.kill())
 
     return fighter
-  }
-
-  function pushPlayerToFront (player) {
-    console.info('Moving player to the front', player)
-    // move player backwards
-    player.movementDirection = 1 // move forwards to the front
-    // playersToLeft.movementDirection = 0 // stay still
-    // playersToRight.movementDirection = -1 // move backwards to make space
-
-    // add handling in the update loop, to use movementDirection
-    // remember to set movementDirection to null, once the player is in position
   }
 
   function create () {
     game.time.advancedTiming = true
     game.add.sprite(0, 0, 'background')
+    playersStateText = game.add.text(0, 0, 'playersStateText')
+    gameStatusText = game.add.text(game.world.right - 220, 0, 'gameStatusText')
 
     const distBetweenFighters = 15
-    players[0] = createFighter('player', game.world.centerX - game.width / 6, game.world.centerY, PLAYER_MAX_HEALTH)
-    players[1] = createFighter('player', game.world.centerX - game.width / 6 - (PERSON_WIDTH + distBetweenFighters), game.world.centerY, PLAYER_MAX_HEALTH)
-    players[2] = createFighter('player', game.world.centerX - game.width / 6 - 2 * (PERSON_WIDTH + distBetweenFighters), game.world.centerY, PLAYER_MAX_HEALTH)
+    players.sprites[0] = createFighter('player', game.world.centerX - game.width / 6, game.world.centerY, PLAYER_MAX_HEALTH, 0)
+    players.sprites[1] = createFighter('player', game.world.centerX - game.width / 6 - (PERSON_WIDTH + distBetweenFighters), game.world.centerY, PLAYER_MAX_HEALTH, 1)
+    players.sprites[2] = createFighter('player', game.world.centerX - game.width / 6 - 2 * (PERSON_WIDTH + distBetweenFighters), game.world.centerY, PLAYER_MAX_HEALTH, 2)
+    players.count = 3
+    players.sprites[0].damage(5)
 
-    enemies[0] = createFighter('enemy', game.world.centerX + COMBAT_DISTANCE, game.world.centerY)
-    enemies[1] = createFighter('enemy', game.world.centerX + COMBAT_DISTANCE + PERSON_WIDTH + distBetweenFighters, game.world.centerY)
-    enemies[2] = createFighter('enemy', game.world.centerX + COMBAT_DISTANCE + 2 * (PERSON_WIDTH + distBetweenFighters), game.world.centerY)
+    enemies.sprites[0] = createFighter('enemy', game.world.centerX + COMBAT_DISTANCE, game.world.centerY, ENEMY_MAX_HEALTH, 0)
+    enemies.sprites[1] = createFighter('enemy', game.world.centerX + COMBAT_DISTANCE + PERSON_WIDTH + distBetweenFighters, game.world.centerY, ENEMY_MAX_HEALTH, 1)
+    enemies.sprites[2] = createFighter('enemy', game.world.centerX + COMBAT_DISTANCE + 2 * (PERSON_WIDTH + distBetweenFighters), game.world.centerY, ENEMY_MAX_HEALTH, 2)
 
     chest = game.add.sprite(game.world.right - 130, game.world.bottom - 95, 'chest_closed')
   }
 
+  /* @PARAM {number} placesFromFront the number of places the unit clicked on is from the front of their team */
+  function pushPlayerToFront (placesFromFront) {
+    console.info('player at posi', placesFromFront)
+    if (players.count === 1) {
+      console.info('one player, no need to swap')
+      return
+    } else if (placesFromFront === 0) {
+      console.info('already at front, no need to swap')
+      return
+    }
+    const playerToPushIndex = players.sprites.findIndex(player => player.placesFromFront === placesFromFront)
+    const playerToPush = players.sprites[playerToPushIndex]
+    if (!playerToPush) {
+      console.error('BIG PROBLEM - placesFromFront')
+      return
+    }
+
+    players.state = 'swapping'
+
+    const playerAtFrontX = players.getFirstAliveUnit().x
+
+    let playersToShift = players.getAllAliveUnits().filter(player => player.placesFromFront <= placesFromFront)
+    playersToShift.sort((playerA, playerB) => {
+      return playerB.placesFromFront - playerA.placesFromFront
+    })
+
+    playersToShift.reduce((previousPlayerX, player) => {
+      const originalX = player.x
+      console.info('x: from, to', originalX, previousPlayerX)
+      player.x = previousPlayerX
+      player.placesFromFront++
+      return originalX
+    }, playersToShift[0].x)
+
+    playerToPush.x = playerAtFrontX // move the player to the front
+    playerToPush.placesFromFront = 0 // move the player to the front
+    console.info('push x: from, to', playerToPush.x, playerAtFrontX)
+    players.frontIndex = playerToPushIndex
+
+    // add handling in the update loop, to use xDirection
+    // remember to set xDirection to null, once the player is in position
+  }
+
   function update () {
     const cursors = game.input.keyboard.createCursorKeys()
-
-    function forEachPerson (type, execute) {
+    playersStateText.text = players.state
+    function forEachAlivePerson (type, execute) {
       let persons
-      if (type === 'player') persons = players
-      if (type === 'enemy') persons = enemies
+      if (type === 'player') persons = players.sprites
+      if (type === 'enemy') persons = enemies.sprites
 
       const aliveArray = [
         persons[0].alive,
@@ -110,18 +178,6 @@ window.onload = function () {
           execute(persons[index], index)
         }
       })
-    }
-
-    function getFrontPerson (type) {
-      let persons
-      if (type === 'player') persons = players
-      if (type === 'enemy') persons = enemies
-      const aliveArray = [
-        persons[0].alive,
-        persons[1].alive,
-        persons[2].alive
-      ]
-      return persons[aliveArray.findIndex(alive => alive)]
     }
 
     function distanceBetweenBounds (body1, body2) {
@@ -140,21 +196,22 @@ window.onload = function () {
     }
 
     function movePersons (type) {
-      let xDirection
+      let defaultXDirection
       if (type === 'player') {
-        xDirection = 1
+        defaultXDirection = 1
       } else if (type === 'enemy') {
-        xDirection = -1
+        defaultXDirection = -1
       } else {
         console.error('unregonised type', type, 'in movePersons')
         return
       }
 
       const executeOnPerson = person => {
+        const xDirection = (typeof person.xDirection === 'number') ? person.xDirection : defaultXDirection
         person.body.velocity.x = PERSON_MOVEMENT_VELOCITY * xDirection
       }
 
-      forEachPerson(type, executeOnPerson)
+      forEachAlivePerson(type, executeOnPerson)
     }
 
     function isOverlapping (spriteA, spriteB) {
@@ -171,37 +228,40 @@ window.onload = function () {
       )
     }
 
-    const firstPlayer = getFrontPerson('player')
-    const firstEnemy = getFrontPerson('enemy')
+    const firstPlayer = players.getFirstAliveUnit()
+    const firstEnemy = enemies.getFirstAliveUnit()
+
+    const updatePerson = person => {
+      person.combat.attackTimer--
+      person.body.velocity.x = 0
+      person.healthBar.setPosition(person.x + 3, person.y - 14)
+    }
 
     if (firstPlayer) {
-      forEachPerson('player', player => {
-        player.combat.attackTimer--
-        player.body.velocity.x = 0
-        player.healthBar.setPosition(player.x + 4, player.y - 14)
-      })
+      forEachAlivePerson('player', updatePerson)
     } else {
+      gameStatusText.text = 'all players dead'
       console.info('you lose')
       game.paused = true
     }
 
     if (firstEnemy) {
-      forEachPerson('enemy', enemy => {
-        enemy.combat.attackTimer--
-        enemy.body.velocity.x = 0
-        enemy.healthBar.setPosition(enemy.x + 4, enemy.y - 14)
-      })
+      gameStatusText.text = '1+ enemies alive'
+      forEachAlivePerson('enemy', updatePerson)
 
       if (distanceToMiddle(firstEnemy) > COMBAT_DISTANCE / 2) {
+        gameStatusText.text = 'enemies walking'
         movePersons('enemy')
       }
       if (distanceToMiddle(firstPlayer) > COMBAT_DISTANCE / 2) {
+        players.state = 'walking'
         movePersons('player')
       }
 
       if (distanceBetweenBounds(firstPlayer, firstEnemy) <= COMBAT_DISTANCE) {
-        // players and enemies are close, so they attack
+        // players.sprites and enemies.sprites are close, so they attack
         // the first player and first enemy attack each other
+        players.state = 'fighting'
         if (firstPlayer.combat.attackTimer <= 0) {
           attackPerson(firstPlayer, firstEnemy)
         }
@@ -210,13 +270,15 @@ window.onload = function () {
         }
       }
     } else {
+      gameStatusText.text = 'no enemies'
       // no enemies, continue moving through the level
       if (Math.abs(firstPlayer.bottom - game.world.bottom) < 2) {
+        // first player is on ground
         if (isOverlapping(firstPlayer, chest)) {
           chest.loadTexture('chest_open')
           chest.anchor.setTo(0.1, 0.3)
 
-          console.info('you win')
+          gameStatusText.text = 'chest reached'
           game.paused = true
         } else {
           movePersons('player')
