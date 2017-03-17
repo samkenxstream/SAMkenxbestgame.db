@@ -40,13 +40,13 @@ window.onload = function () {
   const gameWidth = TwitchWidth
   const gameHeight = 160
 
-  const PERSON_MOVEMENT_VELOCITY = 80
-  const PERSON_WIDTH = 60
+  const HERO_MOVEMENT_VELOCITY = 80
+  const HERO_WIDTH = 60
 
-  const PLAYER_MAX_HEALTH = 120
-  const ENEMY_MAX_HEALTH = 100 // 17
+  const PLAYER_MAX_HEALTH = 62
+  const ENEMY_MAX_HEALTH = 50
 
-  const DISTANCE_BETWEEN_FIGHTERS = PERSON_WIDTH + 12
+  const DISTANCE_BETWEEN_FIGHTERS = HERO_WIDTH + 12
   const COMBAT_DISTANCE = 28
 
   const game = new Phaser.Game(gameWidth, gameHeight, Phaser.AUTO, '', {
@@ -207,7 +207,7 @@ window.onload = function () {
 
     const UNIT_HEIGHT = 60
 
-    const playerBaseX = game.world.centerX - (PERSON_WIDTH / 2 + COMBAT_DISTANCE / 2)
+    const playerBaseX = game.world.centerX - (HERO_WIDTH / 2 + COMBAT_DISTANCE / 2)
     players.sprites = players.sprites.map((fighterClass, index) => createFighter({
       type: 'player',
       fighterClass,
@@ -219,7 +219,7 @@ window.onload = function () {
 
     players.count = players.sprites.filter(player => player)
 
-    const enemyBaseX = game.world.centerX + (PERSON_WIDTH / 2 + COMBAT_DISTANCE / 2)
+    const enemyBaseX = game.world.centerX + (HERO_WIDTH / 2 + COMBAT_DISTANCE / 2)
     enemies.sprites = enemies.sprites.map((fighterClass, index) => createFighter({
       type: 'enemy',
       fighterClass,
@@ -277,26 +277,26 @@ window.onload = function () {
   function update () {
     const cursors = game.input.keyboard.createCursorKeys()
     playersStateText.text = players.state
-    function forEachAlivePerson (heroType, execute, frontToBack = false) {
-      let persons
+    function forEachAliveHero (heroType, execute, frontToBack = false) {
+      let heroes
       if (heroType instanceof Array) {
-        persons = heroType
+        heroes = heroType
       } else if (heroType === 'player') {
-        persons = players.sprites
+        heroes = players.sprites
       } else if (heroType === 'enemy') {
-        persons = enemies.sprites
+        heroes = enemies.sprites
       }
 
-      const alivePersons = persons.filter(person => person.alive)
-      alivePersons.sort((playerA, playerB) => {
+      const aliveHeroes = heroes.filter(hero => hero.alive)
+      aliveHeroes.sort((playerA, playerB) => {
         return playerB.placesFromFront - playerA.placesFromFront
       })
 
       if (frontToBack) {
-        alivePersons.reverse()
+        aliveHeroes.reverse()
       }
-      alivePersons.forEach((person, index) => {
-        execute(person, index)
+      aliveHeroes.forEach((hero, index) => {
+        execute(hero, index)
       })
     }
 
@@ -305,7 +305,7 @@ window.onload = function () {
       return Math.floor(distBetweenCenters - (Math.abs(body1.width) / 2) - (Math.abs(body2.width) / 2))
     }
 
-    function attackPerson (attacker, victim) {
+    function attackHero (attacker, victim) {
       // attack animation
       attacker.body.velocity.y = -150
 
@@ -355,23 +355,23 @@ window.onload = function () {
       attacker.combat.attackTimer = fps / attacker.combat.attackSpeed
     }
 
-    function movePersons (type) {
+    function moveHeroes (type) {
       let defaultXDirection
       if (type === 'player') {
         defaultXDirection = 1
       } else if (type === 'enemy') {
         defaultXDirection = -1
       } else {
-        console.error('unregonised type', type, 'in movePersons')
+        console.error('unregonised type', type, 'in moveHeroes')
         return
       }
 
-      const executeOnPerson = person => {
-        const xDirection = (typeof person.xDirection === 'number') ? person.xDirection : defaultXDirection
-        person.body.velocity.x = PERSON_MOVEMENT_VELOCITY * xDirection
+      const executeOnHero = hero => {
+        const xDirection = (typeof hero.xDirection === 'number') ? hero.xDirection : defaultXDirection
+        hero.body.velocity.x = HERO_MOVEMENT_VELOCITY * xDirection
       }
 
-      forEachAlivePerson(type, executeOnPerson)
+      forEachAliveHero(type, executeOnHero)
     }
 
     function isOverlapping (spriteA, spriteB) {
@@ -391,7 +391,7 @@ window.onload = function () {
     const firstPlayer = players.getFirstAliveUnit()
     const firstEnemy = enemies.getFirstAliveUnit()
 
-    const updatePerson = (hero, index) => {
+    const updateHero = (hero, index) => {
       hero.combat.attackTimer--
       hero.body.velocity.x = 0
       hero.healthBar.setPosition(hero.x, hero.y - 14)
@@ -402,7 +402,7 @@ window.onload = function () {
     }
 
     if (firstPlayer) {
-      forEachAlivePerson(players.sprites, updatePerson, true)
+      forEachAliveHero(players.sprites, updateHero, true)
     } else {
       gameStatusText.text = 'all heroes dead'
       game.paused = true
@@ -411,15 +411,15 @@ window.onload = function () {
 
     if (firstEnemy) {
       gameStatusText.text = '1+ enemies alive'
-      forEachAlivePerson('enemy', updatePerson, true)
+      forEachAliveHero('enemy', updateHero, true)
 
       if (distanceToMiddle(firstEnemy) > COMBAT_DISTANCE / 2) {
         gameStatusText.text = 'walking'
-        movePersons('enemy')
+        moveHeroes('enemy')
       }
       if (distanceToMiddle(firstPlayer) > COMBAT_DISTANCE / 2) {
         players.state = 'walking'
-        movePersons('player')
+        moveHeroes('player')
       }
 
       if (distanceBetweenBounds(firstPlayer, firstEnemy) <= COMBAT_DISTANCE) {
@@ -428,25 +428,25 @@ window.onload = function () {
         players.state = 'fighting'
         // first player and enemy attack
 /*        if (firstPlayer.combat.attackTimer <= 0) {
-          attackPerson(firstPlayer, firstEnemy)
+          attackHero(firstPlayer, firstEnemy)
         }
         if (firstEnemy.combat.attackTimer <= 0) {
-          attackPerson(firstEnemy, firstPlayer)
+          attackHero(firstEnemy, firstPlayer)
         }*/
         // all heroes attack
-        forEachAlivePerson('player', (hero, index) => {
+        forEachAliveHero('player', (hero, index) => {
           if (hero.placesFromFront <= hero.combat.range) {
             // this hero can attack from a distance
             if (hero.combat.attackTimer <= 0) {
-              attackPerson(hero, firstEnemy)
+              attackHero(hero, firstEnemy)
             }
           }
         }, true)
-        forEachAlivePerson('enemy', (hero, index) => {
+        forEachAliveHero('enemy', (hero, index) => {
           if (hero.placesFromFront <= hero.combat.range) {
             // this hero is in range to attack
             if (hero.combat.attackTimer <= 0) {
-              attackPerson(hero, firstPlayer)
+              attackHero(hero, firstPlayer)
             }
           }
         }, true)
@@ -464,7 +464,7 @@ window.onload = function () {
           game.paused = true
         } else {
           players.state = 'walking'
-          movePersons('player')
+          moveHeroes('player')
         }
       }
     }
@@ -472,10 +472,10 @@ window.onload = function () {
     // keyboard movement for testing purposes
     if (cursors.left.isDown) {
       //  Move to the left
-      firstPlayer.body.velocity.x = -2 * PERSON_MOVEMENT_VELOCITY
+      firstPlayer.body.velocity.x = -2 * HERO_MOVEMENT_VELOCITY
     } else if (cursors.right.isDown) {
       //  Move to the right
-      firstPlayer.body.velocity.x = 2 * PERSON_MOVEMENT_VELOCITY
+      firstPlayer.body.velocity.x = 2 * HERO_MOVEMENT_VELOCITY
     }
   }
 }
