@@ -5,7 +5,14 @@
   <title>Gacha for good</title>
   <style>
     body {
-      background-color: '#fcfcfc';
+      background-image: url('images/temp/mock_g4g_webpage.png');
+      background-repeat: no-repeat;
+      width: 1024px;
+      height: 768px;
+      overflow: hidden;
+      margin: 0;
+      padding-top: 55px;
+      padding-left: 20px;
     }
     div.btc {
       display: flex;
@@ -20,11 +27,9 @@
   </style>
 </head>
 <body>
-  <div class="btc">
-    <button onclick="window.location.reload()">Refresh page</button>
-  </div>
   <script src="phaser.min.js"></script>
   <script src="plugins/HealthBar.standalone.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.4/lodash.min.js"></script>
   <script src="game.js"></script>
 </body>
 </html>

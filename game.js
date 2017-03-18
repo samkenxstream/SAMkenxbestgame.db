@@ -1,4 +1,4 @@
-/* global Phaser, HealthBar */
+/* global Phaser, HealthBar, _ */
 // Phaser version 2.6.2 - "Kore Springs"
 const COLORS = {
   player: {
@@ -36,9 +36,9 @@ const COLORS = {
 }
 
 window.onload = function () {
-  const TwitchWidth = 847
+  const TwitchWidth = 644
   const gameWidth = TwitchWidth
-  const gameHeight = 160
+  const gameHeight = 125
 
   const HERO_MOVEMENT_VELOCITY = 80
   const HERO_WIDTH = 60
@@ -499,16 +499,8 @@ window.onload = function () {
 
       if (distanceBetweenBounds(firstPlayer, firstEnemy) <= COMBAT_DISTANCE) {
         // heroes are in combat range
-        // the first player and first enemy attack each other
         players.state = 'fighting'
-        // first player and enemy attack
-/*        if (firstPlayer.combat.attackTimer <= 0) {
-          attackHero(firstPlayer, firstEnemy)
-        }
-        if (firstEnemy.combat.attackTimer <= 0) {
-          attackHero(firstEnemy, firstPlayer)
-        }*/
-        // all heroes attack
+        // all heroes attack if they are in range
         forEachAliveHero('player', (hero, index) => {
           if (hero.placesFromFront <= hero.combat.range) {
             // this hero can attack from a distance
