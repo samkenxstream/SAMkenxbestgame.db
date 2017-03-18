@@ -1,4 +1,5 @@
 /* global Phaser, HealthBar, _ */
+/* eslint-disable comma-dangle */
 // Phaser version 2.6.2 - "Kore Springs"
 const COLORS = {
   player: {
@@ -36,24 +37,38 @@ const COLORS = {
 }
 
 window.onload = function () {
-  const TwitchWidth = 644
-  const gameWidth = TwitchWidth
-  const gameHeight = 125
+  const MIN_TWITCH_WIDTH = 644
+  const GAME_WIDTH = MIN_TWITCH_WIDTH
+  const GAME_HEIGHT = 125
 
   const HERO_MOVEMENT_VELOCITY = 80
   const HERO_WIDTH = 60
+  const HERO_HEIGHT = 60
 
-  const PLAYER_MAX_HEALTH = 62
-  const ENEMY_MAX_HEALTH = 62
+  /* HEALTH */
+  const PLAYER_MAX_HEALTH = 100
+  const ENEMY_MAX_HEALTH = 25
 
-  const DISTANCE_BETWEEN_FIGHTERS = HERO_WIDTH + 12
+  const DISTANCE_BETWEEN_HEROES = HERO_WIDTH + 12
   const COMBAT_DISTANCE = 28
+  const ENEMY_BASE_X = GAME_WIDTH / 2 + (HERO_WIDTH / 2 + COMBAT_DISTANCE / 2)
 
-  const game = new Phaser.Game(gameWidth, gameHeight, Phaser.AUTO, '', {
+  const game = new Phaser.Game(GAME_WIDTH, GAME_HEIGHT, Phaser.AUTO, '', {
     preload,
     create,
-    update
+    update,
+    render
   })
+
+  let chest,
+    projectiles,
+    lineCameraMiddle,
+    background
+  let zone = 0
+
+  const getAllAliveUnits = function () {
+    return _.filter(this.sprites, sprite => sprite.alive)
+  }
 
   const getFirstAliveUnit = function () {
     const aliveSprites = this.getAllAliveUnits()
@@ -66,8 +81,14 @@ window.onload = function () {
     return frontAliveSprite
   }
 
-  const getAllAliveUnits = function () {
-    return this.sprites.filter(sprite => sprite.alive)
+  const onHeroKilled = function () {
+    if (this.getAllAliveUnits().length === 0) {
+      // expand world to include another zone
+      zone++
+      console.info('zone', zone)
+      const extraDistanceToNextFight = (5 / 7) * GAME_WIDTH // on top walking to the edge of the current zone
+      game.world.resize(game.world.width + extraDistanceToNextFight, game.world.height)
+    }
   }
 
   let players = {
@@ -78,29 +99,25 @@ window.onload = function () {
     ],
     frontIndex: 0, // index of the player at the front, ready to attack
     state: 'idle', // 'idle', walking', 'fighting', swapping'
-    count: 0,
     getAllAliveUnits,
-    getFirstAliveUnit
+    getFirstAliveUnit,
+    onHeroKilled
   }
 
   let enemies = {
     sprites: [
-      'archer',
-      'knight',
       'knight',
     ],
     frontIndex: 0, // index of the player at the front, ready to attack
+    state: 'idle', // 'idle', walking', 'fighting', swapping'
     getAllAliveUnits,
-    getFirstAliveUnit
+    getFirstAliveUnit,
+    onHeroKilled
   }
 
-  let chest,
-    playersStateText,
-    gameStatusText,
-    projectiles
-
   function preload () {
-    game.load.image('background', 'images/background1.png')
+    game.load.image('background_demo', 'images/background1.png')
+    game.load.image('background_1', 'images/backgrounds/grass.gif')
 
     game.load.image('knight_orange', 'images/characters/knight_orange_60x57.png')
     game.load.image('knight_blue', 'images/characters/knight_blue_60x57.png')
@@ -114,18 +131,18 @@ window.onload = function () {
     game.load.image('chest_closed', 'images/chest_closed.png')
   }
 
-  function createFighter ({type, fighterClass, x, y, maxHealth, placesFromFront}) {
+  function createFighter (teamObject, {team, fighterClass, x, y, combatLevel = 0, maxHealth, placesFromFront, onKilled}) {
     // numFromFront is the number
     let fighter
     let spriteSuffix
     let xDirection
     let flipHorizontally = false
 
-    if (type === 'player') {
+    if (team === 'player') {
       spriteSuffix = '_blue'
       xDirection = 1
       flipHorizontally = true
-    } else if (type === 'enemy') {
+    } else if (team === 'enemy') {
       spriteSuffix = '_orange'
       xDirection = -1
     }
@@ -143,7 +160,7 @@ window.onload = function () {
     }
 
     fighter.info = {
-      type,
+      team,
       fighterClass,
       xDirection
     }
@@ -156,9 +173,6 @@ window.onload = function () {
     game.physics.arcade.enable(fighter)
     fighter.body.collideWorldBounds = true
     fighter.body.gravity.y = 700
-
-    fighter.maxHealth = maxHealth
-    fighter.health = fighter.maxHealth
 
     fighter.placesFromFront = placesFromFront
     fighter.shiftBackwards = (places = 1) => {
@@ -174,66 +188,85 @@ window.onload = function () {
       fighter.input.useHandCursor = fighter.placesFromFront > 0
     }
 
+    const extraHealthPerLevel = 3
+
+    fighter.maxHealth = maxHealth + (extraHealthPerLevel * combatLevel)
+    fighter.health = fighter.maxHealth
+    console.info('hp', fighter.health)
+
     let bar = { color: '#e2b100' }
-    if (type === 'player') {
+    if (team === 'player') {
       bar = { color: '#48ad05' }
       fighter.inputEnabled = true
       fighter.events.onInputDown.add(() => pushPlayerToFront(fighter.placesFromFront))
     }
     fighter.healthBar = new HealthBar(game, {x: x - 4, y: y - 15, width: 50, height: 10, bar})
-    // fighter.addChild(HealthBar(game, {x, y: y - 15, width: 60, height: 10}))
 
-    fighter.combat = {
+    const baseStats = {
       attackTimer: 0,
+      level: combatLevel,
       range: (fighterClass === 'archer') ? 1 : 0,
       attackSpeed: 1.0,
       minHitDamage: 3,
       maxHitDamage: 6,
       critChance: 0.3,
-      get hitDamage () {
-        const randomDamage = Math.ceil(this.minHitDamage + (this.maxHitDamage - this.minHitDamage) * Math.random())
-        if (Math.random() < this.critChance) {
-          // we got a critical hit!
-          return { value: Math.ceil(this.maxHitDamage * 1.5), critical: true }
-        }
-        return { value: randomDamage, critical: false }
-      }
+      hitDamage
     }
+
+    const extraPerLevel = {
+      attackSpeed: 0.2,
+      minHitDamage: 0.7,
+      maxHitDamage: 0.7,
+      critChance: 0.01,
+    }
+
+    const increasedStats = _.mapValues(extraPerLevel, (statValue, stat) => baseStats[stat] + statValue * combatLevel)
+
+    function hitDamage () {
+      if (Math.random() < increasedStats.critChance) {
+        // we got a critical hit!
+        return { value: Math.ceil(increasedStats.maxHitDamage * 1.5), critical: true }
+      }
+      const randomDamage = Math.ceil(increasedStats.minHitDamage + (increasedStats.maxHitDamage - increasedStats.minHitDamage) * Math.random())
+      return { value: randomDamage, critical: false }
+    }
+
+    const newCombatStats = _.assign({}, baseStats, increasedStats)
+    fighter.combat = newCombatStats
     fighter.events.onKilled.add(() => fighter.healthBar.kill())
+    fighter.events.onKilled.add(onKilled.bind(teamObject))
 
     return fighter
   }
 
   function create () {
-    game.physics.startSystem(Phaser.Physics.ARCADE);
+    game.physics.startSystem(Phaser.Physics.ARCADE)
+    game.time.advancedTiming = true // so we can read fps to calculate attack delays in seconds
+    background = game.add.tileSprite(0, 0, GAME_WIDTH, GAME_HEIGHT, 'background_1')
 
-    game.time.advancedTiming = true
-    game.add.sprite(0, 0, 'background')
-    playersStateText = game.add.text(0, 0, 'playersStateText')
-    gameStatusText = game.add.text(game.world.right - 220, 0, 'gameStatusText')
-
-    const UNIT_HEIGHT = 60
+    // draw middle lines for testing
+    lineCameraMiddle = new Phaser.Line(0, 0, 0, GAME_HEIGHT)
 
     const playerBaseX = game.world.centerX - (HERO_WIDTH / 2 + COMBAT_DISTANCE / 2)
-    players.sprites = players.sprites.map((fighterClass, index) => createFighter({
-      type: 'player',
+    players.sprites = players.sprites.map((fighterClass, index) => createFighter(players, {
+      team: 'player',
       fighterClass,
-      x: playerBaseX - DISTANCE_BETWEEN_FIGHTERS * index,
-      y: game.world.height - UNIT_HEIGHT,
+      x: playerBaseX - DISTANCE_BETWEEN_HEROES * index,
+      y: game.world.height - HERO_HEIGHT,
       maxHealth: PLAYER_MAX_HEALTH,
-      placesFromFront: index
+      placesFromFront: index,
+      onKilled: players.onHeroKilled,
+      combatLevel: 2
     }))
 
-    players.count = players.sprites.filter(player => player)
-
-    const enemyBaseX = game.world.centerX + (HERO_WIDTH / 2 + COMBAT_DISTANCE / 2)
-    enemies.sprites = enemies.sprites.map((fighterClass, index) => createFighter({
-      type: 'enemy',
+    enemies.sprites = enemies.sprites.map((fighterClass, index) => createFighter(enemies, {
+      team: 'enemy',
       fighterClass,
-      x: enemyBaseX + DISTANCE_BETWEEN_FIGHTERS * index,
-      y: game.world.height - UNIT_HEIGHT,
+      x: ENEMY_BASE_X + DISTANCE_BETWEEN_HEROES * index,
+      y: game.world.height - HERO_HEIGHT,
       maxHealth: ENEMY_MAX_HEALTH,
-      placesFromFront: index
+      placesFromFront: index,
+      onKilled: enemies.onHeroKilled
     }))
 
     projectiles = game.add.group()
@@ -244,17 +277,23 @@ window.onload = function () {
     projectiles.setAll('checkWorldBounds', true)
     projectiles.setAll('scale.x', 0.5)
     projectiles.setAll('scale.y', 0.5)
+    projectiles.setAll('scale.y', 0.5)
     projectiles.setAll('angle', -44)
     projectiles.setAll('anchor.x', 1)
     projectiles.setAll('anchor.y', 1)
     projectiles.setAll('outOfBoundsKill', true)
 
-    chest = game.add.sprite(game.world.right - 130, game.world.height - 95, 'chest_closed')
+    // chest = game.add.sprite(game.world.width - 80, game.world.height - 60, 'chest_closed')
+    // chest.scale.setTo(0.8, 0.65)
+  }
+
+  function getCameraCenterX () {
+    return game.camera.width / 2 + game.camera.x
   }
 
   /* @PARAM {number} placesFromFront the number of places the unit clicked on is from the front of their team */
   function pushPlayerToFront (placesFromFront) {
-    if (players.count === 1) {
+    if (players.sprites.length === 1) {
       console.info('one player, no need to swap')
       return
     } else if (placesFromFront === 0) {
@@ -294,12 +333,36 @@ window.onload = function () {
     players.frontIndex = playerToPushIndex
   }
 
+  function spawnEnemy (placesFromFront = 0, combatLevel = 0, fighterClass = 'knight') {
+    const x = getCameraCenterX() + (HERO_WIDTH / 2) + (COMBAT_DISTANCE / 2) + 1
+    const spawnX = x + DISTANCE_BETWEEN_HEROES * placesFromFront
+    console.info('spawning at X', spawnX)
+    enemies.sprites.push(createFighter(enemies, {
+      team: 'enemy',
+      combatLevel,
+      fighterClass,
+      x: x + DISTANCE_BETWEEN_HEROES * placesFromFront,
+      y: game.world.height - HERO_HEIGHT,
+      maxHealth: ENEMY_MAX_HEALTH,
+      placesFromFront,
+      onKilled: enemies.onHeroKilled
+    }))
+  }
+  window.spawn = function () {
+    spawnEnemy(...arguments)
+  }
   function update () {
+    background.width = game.world.width
+    // debugging
+    lineCameraMiddle.centerOn(getCameraCenterX(), game.world.height / 2)
     const cursors = game.input.keyboard.createCursorKeys()
-    playersStateText.text = players.state
 
-    game.physics.arcade.overlap(enemies.sprites, projectiles, projectileHitsEnemy, null, this)
-    game.physics.arcade.overlap(players.sprites, projectiles, projectileHitsPlayer, null, this)
+    const distanceToNextFight = game.world.width - (game.camera.x + game.camera.width)
+    const firstPlayer = players.getFirstAliveUnit()
+    const firstEnemy = enemies.getFirstAliveUnit()
+
+    game.physics.arcade.overlap(enemies.sprites, projectiles, projectileHitsHero, null, this)
+    game.physics.arcade.overlap(players.sprites, projectiles, projectileHitsHero, null, this)
 
     function forEachAliveHero (heroType, execute, frontToBack = false) {
       let heroes
@@ -329,22 +392,14 @@ window.onload = function () {
       return Math.floor(distBetweenCenters - (Math.abs(body1.width) / 2) - (Math.abs(body2.width) / 2))
     }
 
-    function projectileHitsEnemy (enemy, projectile) {
-      if (projectile.info.team === 'player') {
-        // projectile is hitting an enemy
-        dealDamage(projectile.shooter, enemy)
-        projectile.kill()
-      } else {
-        // friendly fire!
-      }
-    }
-    function projectileHitsPlayer (player, projectile) {
-      if (projectile.info.team === 'enemy') {
-        // projectile is hitting a player
-        dealDamage(projectile.shooter, player)
-        projectile.kill()
-      } else {
-        // friendly fire!
+    function projectileHitsHero (victim, projectile) {
+      if (projectile.info.team !== victim.info.team) {
+        // projectile hit a hero and it is not friendly fire
+        // if (vic)
+        if (Math.abs(projectile.body.overlapX) > 30) {
+          dealDamage(projectile.shooter, victim)
+          projectile.kill()
+        }
       }
     }
 
@@ -353,9 +408,9 @@ window.onload = function () {
       // console.info(shooter.info.type, shooter.info.fighterClass, 'shoots', projectile, xDirection)
       const projectile = projectiles.getFirstDead()
       let projectileX = shooter.x + 18 * xDirection
-      projectile.angle += 180;
+      projectile.angle += 180
       if (xDirection < 0) {
-        projectile.angle -= 180;
+        projectile.angle -= 180
         projectileX -= projectile.width
       }
       projectile.reset(projectileX, shooter.y + 22)
@@ -364,7 +419,7 @@ window.onload = function () {
       projectile.body.acceleration.x = -140 * xDirection
       projectile.shooter = shooter
       projectile.info = {
-        team: shooter.info.type,
+        team: shooter.info.team,
         projectileType: projectileType
       }
     }
@@ -373,10 +428,11 @@ window.onload = function () {
       switch (attacker.info.fighterClass) {
         case 'knight':
           // attack animation
-          attacker.body.velocity.y = -130
+          attacker.body.velocity.y = -120
           dealDamage(attacker, victim)
           break
         case 'archer':
+          attacker.body.velocity.y = -180
           shoot(attacker, attacker.info.xDirection)
           break
       }
@@ -388,7 +444,7 @@ window.onload = function () {
     }
 
     function dealDamage (attacker, victim) {
-      const damage = attacker.combat.hitDamage
+      const damage = attacker.combat.hitDamage()
       const damageValue = damage.value
       const damageString = damage.critical ? damageValue.toString() + '!' : damageValue.toString()
       victim.damage(damageValue)
@@ -396,8 +452,8 @@ window.onload = function () {
       // render a hit splat
       const hitSplat = game.add.graphics()
 
-      const splatColors = COLORS[attacker.info.type].hitSplat[attacker.info.fighterClass]
-      const defaultSplatColors = COLORS[attacker.info.type].hitSplat.default
+      const splatColors = COLORS[attacker.info.team].hitSplat[attacker.info.fighterClass]
+      const defaultSplatColors = COLORS[attacker.info.team].hitSplat.default
       const fillColor = damage.critical ? defaultSplatColors.fillCritical : splatColors.fill
       const lineColor = damage.critical ? defaultSplatColors.strokeCritical : splatColors.stroke
       hitSplat.beginFill(fillColor, 1)
@@ -420,7 +476,7 @@ window.onload = function () {
       hitText.setTextBounds(-30, damage.critical ? 0 : 3, 80, 30)
 
       hitSplat.addChild(hitText)
-      if (victim.info.type === 'player') {
+      if (victim.info.team === 'player') {
         hitSplat.scale.x *= -1
       }
       victim.addChild(hitSplat)
@@ -430,14 +486,14 @@ window.onload = function () {
       victim.healthBar.setPercent(victim.health / victim.maxHealth * 100)
     }
 
-    function moveHeroes (type) {
+    function walkAll (team) {
       let defaultXDirection
-      if (type === 'player') {
+      if (team === 'player') {
         defaultXDirection = 1
-      } else if (type === 'enemy') {
+      } else if (team === 'enemy') {
         defaultXDirection = -1
       } else {
-        console.error('unregonised type', type, 'in moveHeroes')
+        console.error('unregonised team', team, 'in walkAll')
         return
       }
 
@@ -446,60 +502,40 @@ window.onload = function () {
         hero.body.velocity.x = HERO_MOVEMENT_VELOCITY * xDirection
       }
 
-      forEachAliveHero(type, executeOnHero)
-    }
-
-    function isOverlapping (spriteA, spriteB) {
-      const boundsA = spriteA.getBounds()
-      const boundsB = spriteB.getBounds()
-      boundsA.width = boundsA.width + 35
-      return Phaser.Rectangle.intersects(boundsA, boundsB)
+      forEachAliveHero(team, executeOnHero)
     }
 
     function distanceToMiddle (sprite) {
       return Math.min(
-        Math.abs(sprite.body.left - game.world.centerX),
-        Math.abs(sprite.body.right - game.world.centerX)
+        Math.abs(sprite.body.left - getCameraCenterX()),
+        Math.abs(sprite.body.right - getCameraCenterX())
       )
     }
-
-    const firstPlayer = players.getFirstAliveUnit()
-    const firstEnemy = enemies.getFirstAliveUnit()
 
     const updateHero = (hero, index) => {
       hero.combat.attackTimer--
       hero.body.velocity.x = 0
       hero.healthBar.setPosition(hero.x, hero.y - 14)
       hero.placesFromFront = index
-      if (hero.info.type === 'player') {
-        gameStatusText.text = `${hero.info.fighterClass} at ${hero.placesFromFront}`
-      }
     }
+
 
     if (firstPlayer) {
       forEachAliveHero(players.sprites, updateHero, true)
     } else {
-      gameStatusText.text = 'all heroes dead'
-      game.paused = true
+      // game over
+      players.state = 'dead'
+      // game.paused = true
       return
     }
 
     if (firstEnemy) {
-      gameStatusText.text = '1+ enemies alive'
       forEachAliveHero('enemy', updateHero, true)
-
-      if (distanceToMiddle(firstEnemy) > COMBAT_DISTANCE / 2) {
-        gameStatusText.text = 'walking'
-        moveHeroes('enemy')
-      }
-      if (distanceToMiddle(firstPlayer) > COMBAT_DISTANCE / 2) {
-        players.state = 'walking'
-        moveHeroes('player')
-      }
 
       if (distanceBetweenBounds(firstPlayer, firstEnemy) <= COMBAT_DISTANCE) {
         // heroes are in combat range
         players.state = 'fighting'
+        enemies.state = 'fighting'
         // all heroes attack if they are in range
         forEachAliveHero('player', (hero, index) => {
           if (hero.placesFromFront <= hero.combat.range) {
@@ -517,23 +553,60 @@ window.onload = function () {
             }
           }
         }, true)
+      } else {
+        players.state = 'waiting for enemy'
+        enemies.state = 'waiting for enemy'
+      }
+
+      if (distanceToMiddle(firstEnemy) > COMBAT_DISTANCE / 2) {
+        enemies.state = 'walking to fight'
+        walkAll('enemy')
+      }
+      if (distanceToMiddle(firstPlayer) > COMBAT_DISTANCE / 2) {
+        players.state = 'walking to fight'
+        walkAll('player')
       }
     } else {
-      gameStatusText.text = 'no enemies'
+      enemies.state = 'dead'
       // no enemies, continue moving through the level
       if (Math.abs(firstPlayer.bottom - game.world.height) < 2) {
         // first player is on ground
+        players.state = 'walking'
+
+/*        const isOverlapping = (spriteA, spriteB) => {
+          const boundsA = spriteA.getBounds()
+          const boundsB = spriteB.getBounds()
+          boundsA.width = boundsA.width + 35
+          return Phaser.Rectangle.intersects(boundsA, boundsB)
+        }
         if (isOverlapping(firstPlayer, chest)) {
           chest.loadTexture('chest_open')
           chest.anchor.setTo(0.1, 0.3)
+          firstPlayer.moveUp()
 
-          gameStatusText.text = '$ $ $ $ $ $ $ $'
-          game.paused = true
+          enemies.state = '$ $ $ $ $ $'
+          // game.paused = true
         } else {
-          players.state = 'walking'
-          moveHeroes('player')
-        }
+          // players.state = 'walking'
+        }*/
       }
+    }
+
+    switch (players.state) {
+      case 'walking':
+        walkAll('player')
+        // focus camera on front player
+        game.camera.focusOnXY(firstPlayer.x + (COMBAT_DISTANCE / 2 + HERO_WIDTH / 2), firstPlayer.y + 0)
+        break
+    }
+
+    switch (enemies.state) {
+      case 'dead':
+        if (distanceToNextFight === 0) {
+          spawnEnemy(0, zone)
+          spawnEnemy(1, zone)
+          spawnEnemy(2, zone)
+        }
     }
 
     // keyboard movement for testing purposes
@@ -545,4 +618,11 @@ window.onload = function () {
       firstPlayer.body.velocity.x = 2 * HERO_MOVEMENT_VELOCITY
     }
   }
+
+  function render () {
+    game.debug.geom(lineCameraMiddle, 'red')
+    game.debug.text(players.state, 5, 20, 'blue')
+    game.debug.text(enemies.state, game.camera.width - 180, 20, 'orange')
+  }
 }
+
