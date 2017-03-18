@@ -1,39 +1,7 @@
 /* global Phaser, HealthBar, _ */
 /* eslint-disable comma-dangle */
-const COLORS = {
-  player: {
-    hitSplat: {
-      knight: {
-        fill: 0xba0c0c,
-        stroke: 0x740606
-      },
-      archer: {
-        fill: 0x0c0ccb,
-        stroke: 0x0c0c94
-      },
-      default: {
-        fillCritical: 0x111111,
-        strokeCritical: 0x000000
-      }
-    }
-  },
-  enemy: {
-    hitSplat: {
-      knight: {
-        fill: 0xba0c0c,
-        stroke: 0x740606
-      },
-      archer: {
-        fill: 0x0c0ccb,
-        stroke: 0x0c0c94
-      },
-      default: {
-        fillCritical: 0x111111,
-        strokeCritical: 0x000000
-      }
-    }
-  }
-}
+
+const c = require('./constants.json')
 
 window.onload = function () {
   const MIN_TWITCH_WIDTH = 644
@@ -43,10 +11,6 @@ window.onload = function () {
   const HERO_MOVEMENT_VELOCITY = 80
   const HERO_WIDTH = 60
   const HERO_HEIGHT = 60
-
-  /* HEALTH */
-  const PLAYER_MAX_HEALTH = 35
-  const ENEMY_MAX_HEALTH = 65
 
   const DISTANCE_BETWEEN_HEROES = HERO_WIDTH + 12
   const COMBAT_DISTANCE = 28
@@ -103,9 +67,9 @@ window.onload = function () {
 
   let players = {
     sprites: [
-      'knight',
-      'archer',
-      'archer',
+      c.classes.mage.key,
+      c.classes.warrior.key,
+      c.classes.archer.key,
     ],
     frontIndex: 0, // index of the player at the front, ready to attack
     state: 'idle', // 'idle', walking', 'fighting', swapping'
@@ -116,7 +80,7 @@ window.onload = function () {
 
   let enemies = {
     sprites: [
-      'knight',
+      c.classes.warrior.key,
     ],
     frontIndex: 0, // index of the player at the front, ready to attack
     state: 'idle', // 'idle', walking', 'fighting', swapping'
@@ -126,15 +90,21 @@ window.onload = function () {
   }
 
   function preload () {
+    // BACKGROUNDS
     game.load.image('background_demo', 'images/background1.png')
     game.load.image('background_1', 'images/backgrounds/grass.gif')
 
-    game.load.image('knight_orange', 'images/characters/knight_orange_60x57.png')
-    game.load.image('knight_blue', 'images/characters/knight_blue_60x57.png')
+    // CHARACTERS
+    game.load.image('warrior_orange', 'images/characters/knight_orange_60x57.png')
+    game.load.image('warrior_blue', 'images/characters/knight_blue_60x57.png')
     game.load.image('archer_blue', 'images/characters/archer_blue_60x60.png')
     game.load.image('archer_orange', 'images/characters/archer_orange_60x60.png')
+    game.load.image('mage_orange', 'images/characters/Trihard.png')
+    game.load.image('mage_blue', 'images/characters/Trihard.png')
 
+    // PARTICLES
     game.load.image('arrow', 'images/particles/arrow.png')
+    game.load.spritesheet('flames', 'images/particles/animated/flames.png', 32, 40)
 
     game.load.image('collectable1', 'images/particles/gold_coin.gif')
     game.load.image('collectable2', 'images/particles/gold_rock.png')
@@ -145,28 +115,24 @@ window.onload = function () {
   }
 
   function createFighter (teamObject, {team, fighterClass, x, y, combatLevel = 0, maxHealth, placesFromFront, onKilled}) {
+    const baseClassStats = c.classes[fighterClass]
+    const baseDefaultStats = c.classes.default
     // numFromFront is the number
     let fighter
     let spriteSuffix
     let xDirection
     let flipHorizontally = false
 
-    if (team === 'player') {
+    if (team === c.teams.player) {
       spriteSuffix = '_blue'
       xDirection = 1
       flipHorizontally = true
-    } else if (team === 'enemy') {
+    } else if (team === c.teams.enemy) {
       spriteSuffix = '_orange'
       xDirection = -1
     }
-    switch (fighterClass) {
-      case 'knight':
-        fighter = game.add.sprite(x, y, 'knight' + spriteSuffix)
-        break
-      case 'archer':
-        fighter = game.add.sprite(x, y, 'archer' + spriteSuffix)
-        break
-    }
+
+    fighter = game.add.sprite(x, y, c.classes[fighterClass].key + spriteSuffix)
 
     if (flipHorizontally) {
       fighter.scale.x *= -1
@@ -185,7 +151,7 @@ window.onload = function () {
     // Physics
     game.physics.arcade.enable(fighter)
     fighter.body.collideWorldBounds = true
-    fighter.body.gravity.y = 700
+    fighter.body.gravity.y = baseClassStats.gravityModifier ? baseClassStats.gravityModifier * 700 : 700
 
     fighter.placesFromFront = placesFromFront
     fighter.shiftBackwards = (places = 1) => {
@@ -201,37 +167,28 @@ window.onload = function () {
       fighter.input.useHandCursor = fighter.placesFromFront > 0
     }
 
-    const extraHealthPerLevel = 4
-
-    fighter.maxHealth = maxHealth + (extraHealthPerLevel * combatLevel)
+    const extraHealthPerLevel = c.classes.default.extraPerLevel.health
+    const baseMaxHealth = baseClassStats.maxHealth || baseDefaultStats.maxHealth
+    fighter.maxHealth = Math.round(baseMaxHealth + (extraHealthPerLevel * combatLevel))
     fighter.health = fighter.maxHealth
     console.info(`new ${fighter.info.team} with ${fighter.health} hp`)
 
     let bar = { color: '#e2b100' }
-    if (team === 'player') {
+    if (team === c.teams.player) {
       bar = { color: '#48ad05' }
       fighter.inputEnabled = true
       fighter.events.onInputDown.add(() => pushPlayerToFront(fighter.placesFromFront))
     }
     fighter.healthBar = new HealthBar(game, {x: x - 4, y: y - 15, width: 50, height: 10, bar})
 
-    const baseStats = {
+    const baseStats = _.assign({}, baseDefaultStats.combat, baseClassStats.combat, {
       attackTimer: 0,
       level: combatLevel,
-      range: (fighterClass === 'archer') ? 1 : 0,
-      attackSpeed: 0.5,
-      minHitDamage: 3,
-      maxHitDamage: 6,
-      critChance: 0.17,
+      range: baseClassStats.combat.range,
       hitDamage
-    }
+    })
 
-    const extraPerLevel = {
-      attackSpeed: 0.15,
-      minHitDamage: 0.6,
-      maxHitDamage: 0.6,
-      critChance: 0.01,
-    }
+    const extraPerLevel = c.classes.default.combatPerLevel
 
     const increasedStats = _.mapValues(extraPerLevel, (statValue, stat) => baseStats[stat] + statValue * combatLevel)
 
@@ -271,16 +228,15 @@ window.onload = function () {
 
     displayGroup = game.add.group()
 
-    // draw middle lines for testing
+    // draw middle line for testing
     lineCameraMiddle = new Phaser.Line(0, 0, 0, GAME_HEIGHT)
 
     const playerBaseX = game.world.centerX - (HERO_WIDTH / 2 + COMBAT_DISTANCE / 2)
     players.sprites = players.sprites.map((fighterClass, index) => createFighter(players, {
-      team: 'player',
+      team: c.teams.player,
       fighterClass,
       x: playerBaseX - DISTANCE_BETWEEN_HEROES * index,
       y: game.world.height - HERO_HEIGHT,
-      maxHealth: PLAYER_MAX_HEALTH,
       placesFromFront: index,
       onKilled: players.onHeroKilled,
       combatLevel: 2
@@ -288,11 +244,10 @@ window.onload = function () {
 
     enemies.sprites = enemies.sprites.map((fighterClass, index) => {
       const enemy = createFighter(enemies, {
-        team: 'enemy',
+        team: c.teams.enemy,
         fighterClass,
         x: ENEMY_BASE_X + DISTANCE_BETWEEN_HEROES * index,
         y: game.world.height - HERO_HEIGHT,
-        maxHealth: ENEMY_MAX_HEALTH,
         placesFromFront: index,
         onKilled: enemies.onHeroKilled
       })
@@ -374,15 +329,14 @@ window.onload = function () {
     players.frontIndex = playerToPushIndex
   }
 
-  function spawnEnemy (placesFromFront = 0, combatLevel = 0, fighterClass = 'knight') {
+  function spawnEnemy (placesFromFront = 0, combatLevel = 0, fighterClass = c.classes.warrior.key) {
     const x = getCameraCenterX() + (HERO_WIDTH / 2) + (COMBAT_DISTANCE / 2) + 1
     const enemy = createFighter(enemies, {
-      team: 'enemy',
+      team: c.teams.enemy,
       combatLevel,
       fighterClass,
       x: x + DISTANCE_BETWEEN_HEROES * placesFromFront,
       y: game.world.height - HERO_HEIGHT,
-      maxHealth: ENEMY_MAX_HEALTH,
       placesFromFront,
       onKilled: enemies.onHeroKilled
     })
@@ -406,13 +360,13 @@ window.onload = function () {
     game.physics.arcade.overlap(enemies.sprites, projectiles, projectileHitsHero, null, this)
     game.physics.arcade.overlap(players.sprites, projectiles, projectileHitsHero, null, this)
 
-    function forEachAliveHero (heroType, execute, frontToBack = false) {
+    function forEachAliveHero (heroTeam, execute, frontToBack = false) {
       let heroes
-      if (heroType instanceof Array) {
-        heroes = heroType
-      } else if (heroType === 'player') {
+      if (heroTeam instanceof Array) {
+        heroes = heroTeam
+      } else if (heroTeam === c.teams.player) {
         heroes = players.sprites
-      } else if (heroType === 'enemy') {
+      } else if (heroTeam === c.teams.enemy) {
         heroes = enemies.sprites
       }
 
@@ -429,9 +383,8 @@ window.onload = function () {
       })
     }
 
-    function distanceBetweenBounds (body1, body2) {
-      const distBetweenCenters = game.physics.arcade.distanceBetween(body1, body2)
-      return Math.floor(distBetweenCenters - (Math.abs(body1.width) / 2) - (Math.abs(body2.width) / 2))
+    function distBetweenHeroes (hero1, hero2) {
+      return Phaser.Math.difference(hero1.body.x, hero2.body.x) - HERO_WIDTH
     }
 
     function projectileHitsHero (victim, projectile) {
@@ -445,9 +398,7 @@ window.onload = function () {
       }
     }
 
-    function shoot (shooter, xDirection, projectileType = 'arrow') {
-      // if (shooter.info.type !== 'enemy') return
-      // console.info(shooter.info.type, shooter.info.fighterClass, 'shoots', projectile, xDirection)
+    function shoot (shooter, xDirection, projectileType = c.projectiles.arrow.key) {
       const projectile = projectiles.getFirstDead()
       let projectileX = shooter.x + 18 * xDirection
       projectile.angle += 180
@@ -464,18 +415,44 @@ window.onload = function () {
         team: shooter.info.team,
         projectileType: projectileType
       }
+      projectile.loadTexture(projectileType)
+      if (projectileType !== c.projectiles.arrow.key) {
+        console.info(shooter.info.fighterClass, projectileType)
+        projectile.scale.setTo(0.4)
+      }
+    }
+
+    function burnTeam (attacker, targetTeam) {
+      forEachAliveHero(targetTeam, victim => {
+        const point = {
+          x: -HERO_WIDTH / 2.5,
+          y: HERO_HEIGHT / 2 - 12
+        }
+        const fireSprite = game.make.sprite(point.x, point.y, 'flames')
+        fireSprite.scale.setTo(1.5, 1)
+        fireSprite.lifespan = (1000 / attacker.combat.attackSpeed) / 1.7
+        fireSprite.animations.add('flicker')
+        fireSprite.animations.play('flicker', 10, true)
+        fireSprite.events.onKilled.add(() => fireSprite.destroy())
+        victim.addChild(fireSprite)
+        dealDamage(attacker, victim)
+      })
     }
 
     function attackHero (attacker, victim) {
       switch (attacker.info.fighterClass) {
-        case 'knight':
+        case c.classes.warrior.key:
           // attack animation
-          attacker.body.velocity.y = -120
+          attacker.body.velocity.y = -110
           dealDamage(attacker, victim)
           break
-        case 'archer':
-          attacker.body.velocity.y = -180
+        case c.classes.archer.key:
+          attacker.body.velocity.y = -170
           shoot(attacker, attacker.info.xDirection)
+          break
+        case c.classes.mage.key:
+          attacker.body.velocity.y = -80
+          burnTeam(attacker, victim.info.team)
           break
       }
       // damage the victim
@@ -495,8 +472,8 @@ window.onload = function () {
       // render a hit splat
       const hitSplat = game.add.graphics()
 
-      const splatColors = COLORS[attacker.info.team].hitSplat[attacker.info.fighterClass]
-      const defaultSplatColors = COLORS[attacker.info.team].hitSplat.default
+      const splatColors = c.colors.hitSplat[attacker.info.fighterClass]
+      const defaultSplatColors = c.colors.hitSplat.default
       const fillColor = damage.critical ? defaultSplatColors.fillCritical : splatColors.fill
       const lineColor = damage.critical ? defaultSplatColors.strokeCritical : splatColors.stroke
       hitSplat.beginFill(fillColor, 1)
@@ -519,16 +496,17 @@ window.onload = function () {
       hitText.setTextBounds(-30, damage.critical ? 0 : 3, 80, 30)
 
       hitSplat.addChild(hitText)
-      if (victim.info.team === 'player') {
+      if (victim.info.team === c.teams.player) {
         hitSplat.scale.x *= -1
       }
+      hitSplat.lifespan = (1000 / attacker.combat.attackSpeed) - 300
+      hitSplat.events.onKilled.add(() => hitSplat.destroy(true))
       victim.addChild(hitSplat)
-      setTimeout(() => { hitSplat.destroy(true) }, (1000 / attacker.combat.attackSpeed) - 300)
 
       // update healthbar
       victim.healthBar.setPercent(victim.health / victim.maxHealth * 100)
 
-      if (victim.info.team === 'enemy') {
+      if (victim.info.team === c.teams.enemy) {
         // drop particles
         particleBurst(victim, 2)
       }
@@ -536,9 +514,9 @@ window.onload = function () {
 
     function walkAll (team) {
       let defaultXDirection
-      if (team === 'player') {
+      if (team === c.teams.player) {
         defaultXDirection = 1
-      } else if (team === 'enemy') {
+      } else if (team === c.teams.enemy) {
         defaultXDirection = -1
       } else {
         console.error('unregonised team', team, 'in walkAll')
@@ -555,8 +533,8 @@ window.onload = function () {
 
     function distanceToMiddle (sprite) {
       return Math.min(
-        Math.abs(sprite.body.left - getCameraCenterX()),
-        Math.abs(sprite.body.right - getCameraCenterX())
+        Math.abs(sprite.left - getCameraCenterX()),
+        Math.abs(sprite.right - getCameraCenterX())
       )
     }
 
@@ -583,14 +561,14 @@ window.onload = function () {
     }
 
     if (firstEnemy) {
-      forEachAliveHero('enemy', updateHero, true)
+      forEachAliveHero(c.teams.enemy, updateHero, true)
 
-      if (distanceBetweenBounds(firstPlayer, firstEnemy) <= COMBAT_DISTANCE) {
+      if (distBetweenHeroes(firstPlayer, firstEnemy) <= COMBAT_DISTANCE) {
         // heroes are in combat range
         players.state = 'fighting'
         enemies.state = 'fighting'
         // all heroes attack if they are in range
-        forEachAliveHero('player', (hero, index) => {
+        forEachAliveHero(c.teams.player, (hero, index) => {
           if (hero.placesFromFront <= hero.combat.range) {
             // this hero can attack from a distance
             if (hero.combat.attackTimer <= 0) {
@@ -598,7 +576,7 @@ window.onload = function () {
             }
           }
         }, true)
-        forEachAliveHero('enemy', (hero, index) => {
+        forEachAliveHero(c.teams.enemy, (hero, index) => {
           if (hero.placesFromFront <= hero.combat.range) {
             // this hero is in range to attack
             if (hero.combat.attackTimer <= 0) {
@@ -611,14 +589,13 @@ window.onload = function () {
         enemies.state = 'waiting for enemy'
       }
 
-
       if (distanceToMiddle(firstPlayer) > COMBAT_DISTANCE / 2) {
         players.state = 'moving to fight'
-        walkAll('player')
+        walkAll(c.teams.player)
       }
       if (distanceToMiddle(firstEnemy) > COMBAT_DISTANCE / 2) {
         enemies.state = 'moving to fight'
-        walkAll('enemy')
+        walkAll(c.teams.enemy)
       }
     } else {
       enemies.state = 'dead'
@@ -647,7 +624,7 @@ window.onload = function () {
 
     switch (players.state) {
       case 'walking':
-        walkAll('player')
+        walkAll(c.teams.player)
         // focus camera on front player
         game.camera.focusOnXY(firstPlayer.x + (COMBAT_DISTANCE / 2 + HERO_WIDTH / 2), firstPlayer.y + 0)
         break

@@ -1,0 +1,84 @@
+{
+  "teams": {
+    "player": "player",
+    "enemy": "enemy"
+  },
+  "classes": {
+    "default": {
+      "maxHealth": 45,
+      "combat": {
+        "range": 0,
+        "attackSpeed": 0.5,
+        "minHitDamage": 3,
+        "maxHitDamage": 6,
+        "critChance": 0.17,
+      },
+      "combatPerLevel": {
+        "attackSpeed": 0.15,
+        "minHitDamage": 0.6,
+        "maxHitDamage": 0.6,
+        "critChance": 0.01,
+      },
+      "extraPerLevel": {
+        "health": 4.7
+      }
+    },
+    "warrior": {
+      "key": "warrior",
+      "combat": {
+        "range": 0
+      }
+    },
+    "archer": {
+      "key": "archer",
+      "combat": {
+        "range": 1
+      }
+    },
+    "mage": {
+      "key": "mage",
+      "maxHealth": 24,
+      "gravityModifier": 0.3,
+      "combat": {
+        "range": 1,
+        "attackSpeed": (0.5 / 2.4),
+        "critChance": 0.1
+      }
+    },
+    "priest": {
+      "key": "priest",
+      "combat": {
+        "range": 0
+      }
+    }
+  },
+  "projectiles": {
+    "arrow": {
+      "key": "arrow"
+    },
+    "fireball": {
+      "key": "fireball",
+      "scale": 0.4
+    }
+  },
+  "colors": {
+    "hitSplat": {
+      "warrior": {
+        "fill": 0xba0c0c,
+        "stroke": 0x740606
+      },
+      "mage": {
+        "fill": 0xdaba0c,
+        "stroke": 0x747406
+      },
+      "archer": {
+        "fill": 0x0c0ccb,
+        "stroke": 0x0c0c94
+      },
+      "default": {
+        "fillCritical": 0x111111,
+        "strokeCritical": 0x000000
+      }
+    }
+  }
+}
