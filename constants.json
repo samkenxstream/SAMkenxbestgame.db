@@ -11,12 +11,12 @@
         "attackSpeed": 0.5,
         "minHitDamage": 3,
         "maxHitDamage": 6,
-        "critChance": 0.17,
+        "critChance": 0.15,
       },
       "combatPerLevel": {
-        "attackSpeed": 0.15,
-        "minHitDamage": 0.6,
-        "maxHitDamage": 0.6,
+        "attackSpeed": 0.13,
+        "minHitDamage": 0.5,
+        "maxHitDamage": 0.5,
         "critChance": 0.01,
       },
       "extraPerLevel": {
@@ -33,10 +33,10 @@
       "key": "archer",
       "combat": {
         "range": 2,
-        "attackSpeed": 0.42,
+        "attackSpeed": 0.42
       },
       "combatPerLevel": {
-        "attackSpeed": 0.11,
+        "attackSpeed": 0.11
       }
     },
     "mage": {
@@ -54,15 +54,16 @@
       "maxHealth": 32,
       "combat": {
         "range": 0,
-        "attackSpeed": 0.8,
-        "minHitDamage": 2,
-        "maxHitDamage": 3,
-        "critChance": 0,
+        "attackSpeed": 0.75,
+        "minHitDamage": 4,
+        "maxHitDamage": 6,
+        "critChance": 0
       },
       "combatPerLevel": {
+        "attackSpeed": 0.05,
         "minHitDamage": 0.2,
         "maxHitDamage": 0.2,
-        "critChance": 0,
+        "critChance": 0
       },
       "abilities": {
         "passive": {

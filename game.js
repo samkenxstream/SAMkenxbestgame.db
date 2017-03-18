@@ -70,6 +70,7 @@ window.onload = function () {
       c.classes.priest.key,
       c.classes.warrior.key,
       c.classes.archer.key,
+      c.classes.mage.key,
     ],
     frontIndex: 0, // index of the player at the front, ready to attack
     state: 'idle', // 'idle', walking', 'fighting', swapping'
@@ -80,7 +81,10 @@ window.onload = function () {
 
   let enemies = {
     sprites: [
-      c.classes.warrior.key,
+      c.classes.priest.key,
+      c.classes.priest.key,
+      c.classes.priest.key,
+      c.classes.priest.key,
     ],
     frontIndex: 0, // index of the player at the front, ready to attack
     state: 'idle', // 'idle', walking', 'fighting', swapping'
@@ -96,12 +100,14 @@ window.onload = function () {
 
     // CHARACTERS
     game.load.image('warrior_orange', 'images/characters/knight_orange_60x57.png')
-    game.load.image('warrior_blue', 'images/characters/knight_blue_60x57.png')
+    // game.load.image('warrior_blue', 'images/characters/knight_blue_60x57.png')
+    game.load.image('warrior_blue', 'images/characters/warrior_kappa_60x.png')
     game.load.image('archer_blue', 'images/characters/archer_blue_60x60.png')
     game.load.image('archer_orange', 'images/characters/archer_orange_60x60.png')
     game.load.image('mage_orange', 'images/characters/Trihard.png')
     game.load.image('mage_blue', 'images/characters/Trihard.png')
-    game.load.image('priest_blue', 'images/characters/priest_blue_60x63.png')
+    game.load.image('priest_blue', 'images/characters/priest_feelsgood_60x75.png')
+    game.load.image('priest_orange', 'images/characters/priest_feelsgood_60x75.png')
 
     // PARTICLES
     game.load.image('arrow', 'images/particles/arrow.png')
@@ -574,11 +580,11 @@ window.onload = function () {
       updateHealthBar(hero, hero.healthBar)
     }
 
-    function castAbility (caster, ability) {
+    function castAbility (caster, ability, abilityPerLevel) {
       switch (ability.name) {
         case 'heal_team':
           forEachAliveHero(caster.info.team, hero => {
-            healHero(hero, ability.value + caster.combat.level)
+            healHero(hero, ability.value + (abilityPerLevel.value * caster.combat.level))
           })
           break
       }
@@ -630,7 +636,8 @@ window.onload = function () {
       const passiveAbility = _.get(hero, ['abilities', 'passive'])
       if (passiveAbility && passiveAbility.timer <= 0) {
         // passive ability ready to use
-        castAbility(hero, passiveAbility)
+        const abilityPerLevel = _.get(hero, ['abilitiesPerLevel', 'passive'])
+        castAbility(hero, passiveAbility, abilityPerLevel)
         passiveAbility.timer = passiveAbility.cooldown
       }
       if (hero.health > hero.maxHealth) hero.health = hero.maxHealth
