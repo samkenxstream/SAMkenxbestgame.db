@@ -32,7 +32,11 @@
     "archer": {
       "key": "archer",
       "combat": {
-        "range": 1
+        "range": 2,
+        "attackSpeed": 0.42,
+      },
+      "combatPerLevel": {
+        "attackSpeed": 0.11,
       }
     },
     "mage": {
@@ -47,8 +51,31 @@
     },
     "priest": {
       "key": "priest",
+      "maxHealth": 32,
       "combat": {
-        "range": 0
+        "range": 0,
+        "attackSpeed": 0.8,
+        "minHitDamage": 2,
+        "maxHitDamage": 3,
+        "critChance": 0,
+      },
+      "combatPerLevel": {
+        "minHitDamage": 0.2,
+        "maxHitDamage": 0.2,
+        "critChance": 0,
+      },
+      "abilities": {
+        "passive": {
+          "name": "heal_team",
+          "value": 4,
+          "cooldown": 520,
+          "timer": 520
+        }
+      },
+      "abilitiesPerLevel": {
+        "passive": {
+          "value": 1
+        }
       }
     }
   },
@@ -67,18 +94,24 @@
         "fill": 0xba0c0c,
         "stroke": 0x740606
       },
+      "archer": {
+        "fill": 0x0c0ccb,
+        "stroke": 0x0c0c94
+      },
       "mage": {
         "fill": 0xdaba0c,
         "stroke": 0x747406
       },
-      "archer": {
-        "fill": 0x0c0ccb,
-        "stroke": 0x0c0c94
+      "priest": {
+        "fill": 0xba0c0c,
+        "stroke": 0x740606
       },
       "default": {
         "fillCritical": 0x111111,
         "strokeCritical": 0x000000
       }
-    }
+    },
+    "green": 0x0cc50c,
+    "darkGreen": 0x0cac0c
   }
 }

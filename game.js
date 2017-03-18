@@ -67,7 +67,7 @@ window.onload = function () {
 
   let players = {
     sprites: [
-      c.classes.mage.key,
+      c.classes.priest.key,
       c.classes.warrior.key,
       c.classes.archer.key,
     ],
@@ -101,6 +101,7 @@ window.onload = function () {
     game.load.image('archer_orange', 'images/characters/archer_orange_60x60.png')
     game.load.image('mage_orange', 'images/characters/Trihard.png')
     game.load.image('mage_blue', 'images/characters/Trihard.png')
+    game.load.image('priest_blue', 'images/characters/priest_blue_60x63.png')
 
     // PARTICLES
     game.load.image('arrow', 'images/particles/arrow.png')
@@ -115,8 +116,8 @@ window.onload = function () {
   }
 
   function createFighter (teamObject, {team, fighterClass, x, y, combatLevel = 0, maxHealth, placesFromFront, onKilled}) {
-    const baseClassStats = c.classes[fighterClass]
-    const baseDefaultStats = c.classes.default
+    const baseClass = c.classes[fighterClass]
+    const baseDefault = c.classes.default
     // numFromFront is the number
     let fighter
     let spriteSuffix
@@ -133,6 +134,9 @@ window.onload = function () {
     }
 
     fighter = game.add.sprite(x, y, c.classes[fighterClass].key + spriteSuffix)
+    if (fighterClass === c.classes.priest.key) console.info(baseClass.abilities)
+    fighter.abilities = baseClass.abilities
+    fighter.abilitiesPerLevel = baseClass.abilitiesPerLevel
 
     if (flipHorizontally) {
       fighter.scale.x *= -1
@@ -151,7 +155,7 @@ window.onload = function () {
     // Physics
     game.physics.arcade.enable(fighter)
     fighter.body.collideWorldBounds = true
-    fighter.body.gravity.y = baseClassStats.gravityModifier ? baseClassStats.gravityModifier * 700 : 700
+    fighter.body.gravity.y = baseClass.gravityModifier ? baseClass.gravityModifier * 700 : 700
 
     fighter.placesFromFront = placesFromFront
     fighter.shiftBackwards = (places = 1) => {
@@ -168,7 +172,7 @@ window.onload = function () {
     }
 
     const extraHealthPerLevel = c.classes.default.extraPerLevel.health
-    const baseMaxHealth = baseClassStats.maxHealth || baseDefaultStats.maxHealth
+    const baseMaxHealth = baseClass.maxHealth || baseDefault.maxHealth
     fighter.maxHealth = Math.round(baseMaxHealth + (extraHealthPerLevel * combatLevel))
     fighter.health = fighter.maxHealth
     console.info(`new ${fighter.info.team} with ${fighter.health} hp`)
@@ -181,10 +185,10 @@ window.onload = function () {
     }
     fighter.healthBar = new HealthBar(game, {x: x - 4, y: y - 15, width: 50, height: 10, bar})
 
-    const baseStats = _.assign({}, baseDefaultStats.combat, baseClassStats.combat, {
+    const baseStats = _.assign({}, baseDefault.combat, baseClass.combat, {
       attackTimer: 0,
       level: combatLevel,
-      range: baseClassStats.combat.range,
+      range: baseClass.combat.range,
       hitDamage
     })
 
@@ -407,9 +411,9 @@ window.onload = function () {
         projectileX -= projectile.width
       }
       projectile.reset(projectileX, shooter.y + 22)
-      projectile.body.velocity.x = 460 * xDirection
+      projectile.body.velocity.x = 700 * xDirection
       projectile.body.gravity.y = 230
-      projectile.body.acceleration.x = -140 * xDirection
+      projectile.body.acceleration.x = -340 * xDirection
       projectile.shooter = shooter
       projectile.info = {
         team: shooter.info.team,
@@ -454,6 +458,10 @@ window.onload = function () {
           attacker.body.velocity.y = -80
           burnTeam(attacker, victim.info.team)
           break
+        case c.classes.priest.key:
+          attacker.body.velocity.y = -90
+          dealDamage(attacker, victim)
+          break
       }
       // damage the victim
 
@@ -462,9 +470,51 @@ window.onload = function () {
       attacker.combat.attackTimer = fps / attacker.combat.attackSpeed
     }
 
+    function renderHitSplat (hero, text, style, lifespan) {
+      // render a hit splat
+      const hitSplat = game.add.graphics()
+
+      const fillColor = style.fill
+      const lineColor = style.stroke
+      hitSplat.beginFill(fillColor, 1)
+      hitSplat.lineStyle(3, lineColor, 1)
+
+      const rect = {
+        x: -20,
+        y: 20,
+        width: 36,
+        height: 20
+      }
+      hitSplat.drawRect(rect.x, rect.y, rect.width, rect.height)
+
+      const splatTextStyle = {
+        fill: 'white',
+        fontSize: '20px',
+        boundsAlignH: 'center'
+      }
+      const hitText = game.make.text(-10, rect.y - 3, text.toString(), splatTextStyle)
+      hitText.setTextBounds(-30, 3, 80, 30)
+
+      hitSplat.addChild(hitText)
+      if (hero.info.team === c.teams.player) {
+        hitSplat.scale.x *= -1
+      }
+      hitSplat.lifespan = lifespan
+      hitSplat.events.onKilled.add(() => hitSplat.destroy(true))
+      hero.addChild(hitSplat)
+    }
+
+    function updateHealthBar (hero, healthBar) {
+      healthBar.setPercent(hero.health / hero.maxHealth * 100)
+    }
+
     function dealDamage (attacker, victim) {
       const damage = attacker.combat.hitDamage()
-      const damageValue = damage.value
+      let damageValue = damage.value
+      if (attacker.info.fighterClass === c.classes.archer.key) {
+        // archers deal more damage from further away
+        damageValue = Math.round(damageValue + damageValue * (attacker.placesFromFront * 0.3))
+      }
       const damageString = damage.critical ? damageValue.toString() + '!' : damageValue.toString()
       victim.damage(damageValue)
       victim.combat.framesSinceDamageTaken = 0
@@ -504,11 +554,33 @@ window.onload = function () {
       victim.addChild(hitSplat)
 
       // update healthbar
-      victim.healthBar.setPercent(victim.health / victim.maxHealth * 100)
+      updateHealthBar(victim, victim.healthBar)
 
       if (victim.info.team === c.teams.enemy) {
         // drop particles
         particleBurst(victim, 2)
+      }
+    }
+
+    function healHero (hero, healValue) {
+      hero.heal(healValue)
+      if (hero.health > hero.maxHealth) {
+        hero.health = hero.maxHealth
+      }
+      renderHitSplat(hero, '+' + healValue, {
+        fill: c.colors.green,
+        stroke: c.colors.darkGreen
+      }, 850)
+      updateHealthBar(hero, hero.healthBar)
+    }
+
+    function castAbility (caster, ability) {
+      switch (ability.name) {
+        case 'heal_team':
+          forEachAliveHero(caster.info.team, hero => {
+            healHero(hero, ability.value + caster.combat.level)
+          })
+          break
       }
     }
 
@@ -541,14 +613,27 @@ window.onload = function () {
     const updateHero = (hero, index) => {
       if (hero.combat.framesSinceDamageTaken > 320) {
         hero.health += 0.18
-        if (hero.health > hero.maxHealth) hero.health = hero.maxHealth
         hero.healthBar.setPercent(hero.health / hero.maxHealth * 100)
       }
       hero.combat.attackTimer--
+      if (hero.abilities) {
+        hero.abilities = _.mapValues(hero.abilities, ability => {
+          ability.timer--
+          return ability
+        })
+      }
       hero.combat.framesSinceDamageTaken++
       hero.body.velocity.x = 0
       hero.healthBar.setPosition(hero.x, hero.y - 14)
       hero.placesFromFront = index
+
+      const passiveAbility = _.get(hero, ['abilities', 'passive'])
+      if (passiveAbility && passiveAbility.timer <= 0) {
+        // passive ability ready to use
+        castAbility(hero, passiveAbility)
+        passiveAbility.timer = passiveAbility.cooldown
+      }
+      if (hero.health > hero.maxHealth) hero.health = hero.maxHealth
     }
 
     if (firstPlayer) {
