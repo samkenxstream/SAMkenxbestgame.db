@@ -1,6 +1,5 @@
 /* global Phaser, HealthBar, _ */
 /* eslint-disable comma-dangle */
-// Phaser version 2.6.2 - "Kore Springs"
 const COLORS = {
   player: {
     hitSplat: {
@@ -46,12 +45,13 @@ window.onload = function () {
   const HERO_HEIGHT = 60
 
   /* HEALTH */
-  const PLAYER_MAX_HEALTH = 100
-  const ENEMY_MAX_HEALTH = 25
+  const PLAYER_MAX_HEALTH = 35
+  const ENEMY_MAX_HEALTH = 65
 
   const DISTANCE_BETWEEN_HEROES = HERO_WIDTH + 12
   const COMBAT_DISTANCE = 28
   const ENEMY_BASE_X = GAME_WIDTH / 2 + (HERO_WIDTH / 2 + COMBAT_DISTANCE / 2)
+  const MAX_ENEMIES_PER_ZONE = 3
 
   const game = new Phaser.Game(GAME_WIDTH, GAME_HEIGHT, Phaser.AUTO, '', {
     preload,
@@ -59,11 +59,12 @@ window.onload = function () {
     update,
     render
   })
-
   let chest,
     projectiles,
     lineCameraMiddle,
-    background
+    background,
+    coinEmitter,
+    displayGroup
   let zone = 0
 
   const getAllAliveUnits = function () {
@@ -81,8 +82,17 @@ window.onload = function () {
     return frontAliveSprite
   }
 
-  const onHeroKilled = function () {
+  const onPlayerKilled = function () {
     if (this.getAllAliveUnits().length === 0) {
+      // all players dead, game over
+      console.info('game over')
+    }
+  }
+
+  const onEnemyKilled = function (enemy) {
+    particleBurst(enemy, 5)
+    if (this.getAllAliveUnits().length === 0) {
+      // last enemy killed
       // expand world to include another zone
       zone++
       console.info('zone', zone)
@@ -101,7 +111,7 @@ window.onload = function () {
     state: 'idle', // 'idle', walking', 'fighting', swapping'
     getAllAliveUnits,
     getFirstAliveUnit,
-    onHeroKilled
+    onHeroKilled: onPlayerKilled
   }
 
   let enemies = {
@@ -112,7 +122,7 @@ window.onload = function () {
     state: 'idle', // 'idle', walking', 'fighting', swapping'
     getAllAliveUnits,
     getFirstAliveUnit,
-    onHeroKilled
+    onHeroKilled: onEnemyKilled
   }
 
   function preload () {
@@ -125,6 +135,9 @@ window.onload = function () {
     game.load.image('archer_orange', 'images/characters/archer_orange_60x60.png')
 
     game.load.image('arrow', 'images/particles/arrow.png')
+
+    game.load.image('collectable1', 'images/particles/gold_coin.gif')
+    game.load.image('collectable2', 'images/particles/gold_rock.png')
 
     game.load.image('chest_closed', 'images/chest_closed.png')
     game.load.image('chest_open', 'images/chest_open.png')
@@ -188,11 +201,11 @@ window.onload = function () {
       fighter.input.useHandCursor = fighter.placesFromFront > 0
     }
 
-    const extraHealthPerLevel = 3
+    const extraHealthPerLevel = 4
 
     fighter.maxHealth = maxHealth + (extraHealthPerLevel * combatLevel)
     fighter.health = fighter.maxHealth
-    console.info('hp', fighter.health)
+    console.info(`new ${fighter.info.team} with ${fighter.health} hp`)
 
     let bar = { color: '#e2b100' }
     if (team === 'player') {
@@ -206,17 +219,17 @@ window.onload = function () {
       attackTimer: 0,
       level: combatLevel,
       range: (fighterClass === 'archer') ? 1 : 0,
-      attackSpeed: 1.0,
+      attackSpeed: 0.5,
       minHitDamage: 3,
       maxHitDamage: 6,
-      critChance: 0.3,
+      critChance: 0.17,
       hitDamage
     }
 
     const extraPerLevel = {
-      attackSpeed: 0.2,
-      minHitDamage: 0.7,
-      maxHitDamage: 0.7,
+      attackSpeed: 0.15,
+      minHitDamage: 0.6,
+      maxHitDamage: 0.6,
       critChance: 0.01,
     }
 
@@ -234,15 +247,29 @@ window.onload = function () {
     const newCombatStats = _.assign({}, baseStats, increasedStats)
     fighter.combat = newCombatStats
     fighter.events.onKilled.add(() => fighter.healthBar.kill())
-    fighter.events.onKilled.add(onKilled.bind(teamObject))
+    fighter.events.onKilled.add(onKilled.bind(teamObject, fighter))
 
     return fighter
+  }
+
+  function particleBurst (pointer, count = 3, lifespan = 750) {
+    if (!_.isNumber(count)) count = 3
+    //  Position the emitter where the mouse/touch event was
+    coinEmitter.x = pointer.x
+    coinEmitter.y = pointer.y
+
+    //  The first parameter sets the effect to "explode" which means all particles are emitted at once
+    //  The third argument is ignored when using burst/explode mode
+    //  The final parameter (10) is how many particles will be emitted in this single burst
+    coinEmitter.start(true, lifespan, null, count)
   }
 
   function create () {
     game.physics.startSystem(Phaser.Physics.ARCADE)
     game.time.advancedTiming = true // so we can read fps to calculate attack delays in seconds
     background = game.add.tileSprite(0, 0, GAME_WIDTH, GAME_HEIGHT, 'background_1')
+
+    displayGroup = game.add.group()
 
     // draw middle lines for testing
     lineCameraMiddle = new Phaser.Line(0, 0, 0, GAME_HEIGHT)
@@ -259,15 +286,19 @@ window.onload = function () {
       combatLevel: 2
     }))
 
-    enemies.sprites = enemies.sprites.map((fighterClass, index) => createFighter(enemies, {
-      team: 'enemy',
-      fighterClass,
-      x: ENEMY_BASE_X + DISTANCE_BETWEEN_HEROES * index,
-      y: game.world.height - HERO_HEIGHT,
-      maxHealth: ENEMY_MAX_HEALTH,
-      placesFromFront: index,
-      onKilled: enemies.onHeroKilled
-    }))
+    enemies.sprites = enemies.sprites.map((fighterClass, index) => {
+      const enemy = createFighter(enemies, {
+        team: 'enemy',
+        fighterClass,
+        x: ENEMY_BASE_X + DISTANCE_BETWEEN_HEROES * index,
+        y: game.world.height - HERO_HEIGHT,
+        maxHealth: ENEMY_MAX_HEALTH,
+        placesFromFront: index,
+        onKilled: enemies.onHeroKilled
+      })
+      displayGroup.add(enemy, true, displayGroup.length)
+      return enemy
+    })
 
     projectiles = game.add.group()
     projectiles.enableBody = true
@@ -285,6 +316,16 @@ window.onload = function () {
 
     // chest = game.add.sprite(game.world.width - 80, game.world.height - 60, 'chest_closed')
     // chest.scale.setTo(0.8, 0.65)
+
+    coinEmitter = game.add.emitter(0, 0, 100) // max 100 coins at once
+    coinEmitter.maxParticleScale = 0.08
+    coinEmitter.minParticleScale = 0.08
+
+    // spriteKey, frame, quantity, collide?, collideWorldBounds?
+    // i think that the quantity chosen here restricts the max quantity generated in one call
+    coinEmitter.makeParticles('collectable1', 0, undefined, false, true)
+    coinEmitter.gravity = 380
+    displayGroup.add(coinEmitter, true)
   }
 
   function getCameraCenterX () {
@@ -335,9 +376,7 @@ window.onload = function () {
 
   function spawnEnemy (placesFromFront = 0, combatLevel = 0, fighterClass = 'knight') {
     const x = getCameraCenterX() + (HERO_WIDTH / 2) + (COMBAT_DISTANCE / 2) + 1
-    const spawnX = x + DISTANCE_BETWEEN_HEROES * placesFromFront
-    console.info('spawning at X', spawnX)
-    enemies.sprites.push(createFighter(enemies, {
+    const enemy = createFighter(enemies, {
       team: 'enemy',
       combatLevel,
       fighterClass,
@@ -346,7 +385,10 @@ window.onload = function () {
       maxHealth: ENEMY_MAX_HEALTH,
       placesFromFront,
       onKilled: enemies.onHeroKilled
-    }))
+    })
+    displayGroup.add(enemy)
+    enemies.sprites.push(enemy)
+    return enemy
   }
   window.spawn = function () {
     spawnEnemy(...arguments)
@@ -448,6 +490,7 @@ window.onload = function () {
       const damageValue = damage.value
       const damageString = damage.critical ? damageValue.toString() + '!' : damageValue.toString()
       victim.damage(damageValue)
+      victim.combat.framesSinceDamageTaken = 0
 
       // render a hit splat
       const hitSplat = game.add.graphics()
@@ -484,6 +527,11 @@ window.onload = function () {
 
       // update healthbar
       victim.healthBar.setPercent(victim.health / victim.maxHealth * 100)
+
+      if (victim.info.team === 'enemy') {
+        // drop particles
+        particleBurst(victim, 2)
+      }
     }
 
     function walkAll (team) {
@@ -513,12 +561,17 @@ window.onload = function () {
     }
 
     const updateHero = (hero, index) => {
+      if (hero.combat.framesSinceDamageTaken > 320) {
+        hero.health += 0.18
+        if (hero.health > hero.maxHealth) hero.health = hero.maxHealth
+        hero.healthBar.setPercent(hero.health / hero.maxHealth * 100)
+      }
       hero.combat.attackTimer--
+      hero.combat.framesSinceDamageTaken++
       hero.body.velocity.x = 0
       hero.healthBar.setPosition(hero.x, hero.y - 14)
       hero.placesFromFront = index
     }
-
 
     if (firstPlayer) {
       forEachAliveHero(players.sprites, updateHero, true)
@@ -558,13 +611,14 @@ window.onload = function () {
         enemies.state = 'waiting for enemy'
       }
 
-      if (distanceToMiddle(firstEnemy) > COMBAT_DISTANCE / 2) {
-        enemies.state = 'walking to fight'
-        walkAll('enemy')
-      }
+
       if (distanceToMiddle(firstPlayer) > COMBAT_DISTANCE / 2) {
-        players.state = 'walking to fight'
+        players.state = 'moving to fight'
         walkAll('player')
+      }
+      if (distanceToMiddle(firstEnemy) > COMBAT_DISTANCE / 2) {
+        enemies.state = 'moving to fight'
+        walkAll('enemy')
       }
     } else {
       enemies.state = 'dead'
@@ -572,7 +626,6 @@ window.onload = function () {
       if (Math.abs(firstPlayer.bottom - game.world.height) < 2) {
         // first player is on ground
         players.state = 'walking'
-
 /*        const isOverlapping = (spriteA, spriteB) => {
           const boundsA = spriteA.getBounds()
           const boundsB = spriteB.getBounds()
@@ -603,11 +656,13 @@ window.onload = function () {
     switch (enemies.state) {
       case 'dead':
         if (distanceToNextFight === 0) {
-          spawnEnemy(0, zone)
-          spawnEnemy(1, zone)
-          spawnEnemy(2, zone)
+          for (let count = 1; (count < zone + 1) && (count <= MAX_ENEMIES_PER_ZONE); count++) {
+            spawnEnemy(count - 1, zone)
+          }
         }
     }
+
+    displayGroup.sort('z', Phaser.Group.SORT_DESCENDING)
 
     // keyboard movement for testing purposes
     if (cursors.left.isDown) {
@@ -620,7 +675,7 @@ window.onload = function () {
   }
 
   function render () {
-    game.debug.geom(lineCameraMiddle, 'red')
+    game.debug.geom(lineCameraMiddle, 'grey')
     game.debug.text(players.state, 5, 20, 'blue')
     game.debug.text(enemies.state, game.camera.width - 180, 20, 'orange')
   }
