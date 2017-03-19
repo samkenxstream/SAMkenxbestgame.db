@@ -1,25 +1,27 @@
 /* eslint-disable */
 // keep this file in json syntax so it is easier later when we need it as a json
 module.exports = () => ({
+  "HEALTH_REGEN_DELAY": 6.0,
   "teams": {
     "player": "player",
     "enemy": "enemy"
   },
   "classes": {
     "default": {
-      "maxHealth": 45,
+      "maxHealth": 450,
+      "healthRegen": 1,
       "combat": {
         "range": 0,
         "attackSpeed": 0.25,
-        "minHitDamage": 3,
-        "maxHitDamage": 6,
-        "critChance": 0.15,
+        "minHitDamage": 30.0,
+        "maxHitDamage": 60.0,
+        "critChance": .15,
       },
       "combatPerLevel": {
         "attackSpeed": 0.05,
-        "minHitDamage": 0.5,
-        "maxHitDamage": 0.5,
-        "critChance": 0.01,
+        "minHitDamage": 5.0,
+        "maxHitDamage": 5.0,
+        "critChance": .01,
       },
       "extraPerLevel": {
         "health": 4.7
@@ -29,55 +31,62 @@ module.exports = () => ({
       "key": "warrior",
       "combat": {
         "range": 0
+      },
+      "combatPerLevel": {
+        "minHitDamage": 9.0,
+        "maxHitDamage": 9.0,
+        "critChance": .03
       }
     },
     "archer": {
       "key": "archer",
       "combat": {
         "range": 2,
-        "attackSpeed": 0.32
+        "attackSpeed": .32
       },
       "combatPerLevel": {
-        "attackSpeed": 0.05
+        "attackSpeed": .05
       }
     },
     "mage": {
       "key": "mage",
-      "maxHealth": 24,
-      "gravityModifier": 0.3,
+      "maxHealth": 240,
+      "gravityModifier": .24,
       "combat": {
         "range": 1,
-        "attackSpeed": (0.5 / 2.4),
-        "critChance": 0.1
+        "attackSpeed": (.5 / 2.4),
+        "critChance": .1
       }
     },
     "priest": {
       "key": "priest",
-      "maxHealth": 32,
+      "maxHealth": 320,
+      "gravityModifier": .4,
       "combat": {
         "range": 0,
-        "attackSpeed": 0.5,
-        "minHitDamage": 4,
-        "maxHitDamage": 6,
+        "attackSpeed": 0.9,
+        "minHitDamage": 30.0,
+        "maxHitDamage": 50.0,
         "critChance": 0
       },
       "combatPerLevel": {
-        "attackSpeed": 0.05,
-        "minHitDamage": 0.2,
-        "maxHitDamage": 0.2,
+        "attackSpeed": .05,
+        "minHitDamage": 2.0,
+        "maxHitDamage": 2.0,
         "critChance": 0
       },
       "abilities": {
         "passive": {
           "name": "heal_team",
-          "value": 4,
-          "cooldown": 520,
-          "timer": 520
+          "value": 40.0,
+          "cooldown": 6.0,
+          "timer": null
         }
       },
       "abilitiesPerLevel": {
         "passive": {
-          "value": 1
+          "value": 12.0,
+          "cooldownMultiplier": 0.9
         }
       }
     }

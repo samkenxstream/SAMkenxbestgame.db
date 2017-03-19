@@ -23,6 +23,7 @@ window.onload = () => {
     update,
     render
   })
+  const Menu = require('./Menu.js')(game)
   let projectiles,
     lineCameraMiddle,
     background,
@@ -67,9 +68,9 @@ window.onload = () => {
 
   let players = {
     sprites: [
-      c.classes.archer.key,
       c.classes.warrior.key,
-      c.classes.archer.key,
+      c.classes.mage.key,
+      c.classes.priest.key,
     ],
     frontIndex: 0, // index of the player at the front, ready to attack
     state: 'idle', // 'idle', walking', 'fighting', swapping'
@@ -80,6 +81,7 @@ window.onload = () => {
 
   let enemies = {
     sprites: [
+      c.classes.mage.key,
       c.classes.warrior.key,
     ],
     frontIndex: 0, // index of the player at the front, ready to attack
@@ -125,12 +127,14 @@ window.onload = () => {
     }
 
     fighter = game.add.sprite(x, y, c.classes[fighterClass].key)
-    fighter.abilities = baseClass.abilities
-    fighter.abilitiesPerLevel = baseClass.abilitiesPerLevel
 
+    fighter.anchor.setTo(0.5, 0)
     if (flipHorizontally) {
       fighter.scale.x *= -1
     }
+
+    fighter.abilities = baseClass.abilities
+    fighter.abilitiesPerLevel = baseClass.abilitiesPerLevel
 
     fighter.info = {
       team,
@@ -138,9 +142,10 @@ window.onload = () => {
       xDirection
     }
 
-    fighter.anchor.setTo(0.5, 0)
-    fighter.inputEnabled = true
-    fighter.input.useHandCursor = placesFromFront > 0
+    if (team === c.teams.player) {
+      fighter.inputEnabled = true
+      fighter.input.useHandCursor = placesFromFront > 0
+    }
 
     // Physics
     game.physics.arcade.enable(fighter)
@@ -161,10 +166,14 @@ window.onload = () => {
       fighter.input.useHandCursor = fighter.placesFromFront > 0
     }
 
-    const extraHealthPerLevel = c.classes.default.extraPerLevel.health
+    // health and healthRegen
+    const extraHealthPerLevel = c.classes.default.extraPerLevel.health || 0
     const baseMaxHealth = baseClass.maxHealth || baseDefault.maxHealth
+    const baseHealthRegen = baseClass.healthRegen || baseDefault.healthRegen
+    const extraHealthRegenPerLevel = c.classes.default.extraPerLevel.healthRegen || 0
     fighter.maxHealth = Math.round(baseMaxHealth + (extraHealthPerLevel * combatLevel))
     fighter.health = fighter.maxHealth
+    fighter.healthRegen = baseHealthRegen + (extraHealthRegenPerLevel * combatLevel)
     console.log(`new ${fighter.info.team} ${fighter.info.fighterClass}, ${fighter.health} hp`)
 
     let bar = { color: '#e2b100' }
@@ -173,29 +182,31 @@ window.onload = () => {
       fighter.inputEnabled = true
       fighter.events.onInputDown.add(() => pushPlayerToFront(fighter.placesFromFront))
     }
-    fighter.healthBar = new HealthBar(game, {x: x - 4, y: y - 15, width: 50, height: 8, bar})
+    fighter.healthBar = new HealthBar(game, {x: x - 3, y: y - 15, width: 50, height: 8, bar})
 
-    const baseStats = _.assign({}, baseDefault.combat, baseClass.combat, {
-      attackTimer: 0,
-      level: combatLevel,
-      range: baseClass.combat.range,
-      hitDamage
-    })
-
-    const extraPerLevel = c.classes.default.combatPerLevel
-
-    const increasedStats = _.mapValues(extraPerLevel, (statValue, stat) => baseStats[stat] + statValue * combatLevel)
-
+    // combat values and hit damage
     function hitDamage () {
-      if (Math.random() < increasedStats.critChance) {
+      if (Math.random() < newCombatStats.critChance) {
         // we got a critical hit!
-        return { value: Math.ceil(increasedStats.maxHitDamage * 1.5), critical: true }
+        return { value: Math.ceil(newCombatStats.maxHitDamage * 1.5), critical: true }
       }
-      const randomDamage = Math.ceil(increasedStats.minHitDamage + (increasedStats.maxHitDamage - increasedStats.minHitDamage) * Math.random())
+      const randomDamage = Math.ceil(newCombatStats.minHitDamage + (newCombatStats.maxHitDamage - newCombatStats.minHitDamage) * Math.random())
       return { value: randomDamage, critical: false }
     }
 
-    const newCombatStats = _.assign({}, baseStats, increasedStats)
+    const baseCombatStats = _.assign({}, baseDefault.combat, baseClass.combat, {
+      attackTimer: 0,
+      level: combatLevel,
+      hitDamage
+    })
+
+    const defaultExtraPerLevel = c.classes.default.combatPerLevel
+    const classExtraPerLevel = c.classes[fighterClass].combatPerLevel
+    const extraPerLevel = _.assign({}, defaultExtraPerLevel, classExtraPerLevel)
+
+    const increasedCombatStats = _.mapValues(extraPerLevel, (statValue, stat) => baseCombatStats[stat] + statValue * combatLevel)
+
+    const newCombatStats = _.assign({}, baseCombatStats, increasedCombatStats)
     fighter.combat = newCombatStats
     fighter.events.onKilled.add(() => fighter.healthBar.kill())
     fighter.events.onKilled.add(onKilled.bind(teamObject, fighter))
@@ -204,6 +215,8 @@ window.onload = () => {
   }
 
   function create () {
+    game.state.add('Menu', Menu)
+
     const createCoinsScore = () => {
       const coinsLabelStyle = {
         font: '28px Arial',
@@ -262,7 +275,7 @@ window.onload = () => {
       y: this.game.world.height - HERO_HEIGHT,
       placesFromFront: index,
       onKilled: players.onHeroKilled,
-      combatLevel: 2
+      combatLevel: 0
     }))
 
     enemies.sprites = enemies.sprites.map((fighterClass, index) => {
@@ -489,15 +502,14 @@ window.onload = () => {
 
     const burnTeam = (attacker, targetTeam) => {
       forEachAliveHero(targetTeam, victim => {
-        const y = victim.height / 2
-        const point = {
-          x: -HERO_WIDTH / 2.5,
-          y
+        const firePosition = {
+          x: 0,
+          y: victim.height / 2
         }
-        const fireSprite = this.game.make.sprite(point.x, point.y, 'flames')
+        const fireSprite = this.game.make.sprite(firePosition.x, firePosition.y, 'flames')
         fireSprite.scale.setTo(1.5, 1)
-        fireSprite.anchor.setTo(0)
-        fireSprite.lifespan = (1000 / attacker.combat.attackSpeed) / 1.7
+        fireSprite.anchor.setTo(0.5, 0)
+        fireSprite.lifespan = Math.min((1000 / attacker.combat.attackSpeed) / 1.7, 1200)
         fireSprite.animations.add('flicker')
         fireSprite.animations.play('flicker', 10, true)
         fireSprite.events.onKilled.add(() => fireSprite.destroy())
@@ -515,7 +527,8 @@ window.onload = () => {
       }
       const damageString = damage.critical ? damageValue.toString() + '!' : damageValue.toString()
       victim.damage(damageValue)
-      victim.combat.framesSinceDamageTaken = 0
+      // begin health regeneration some time after damage was taken
+      victim.combat.beginRegenAt = game.time.now + (Phaser.Timer.SECOND * c.HEALTH_REGEN_DELAY)
 
       // render a hit splat
       const hitSplat = game.add.graphics()
@@ -547,7 +560,7 @@ window.onload = () => {
       if (victim.info.team === c.teams.player) {
         hitSplat.scale.x *= -1
       }
-      hitSplat.lifespan = (1000 / attacker.combat.attackSpeed) - 300
+      hitSplat.lifespan = Math.max(300, Math.min(1200, (1000 / attacker.combat.attackSpeed) - 300))
       hitSplat.events.onKilled.add(() => hitSplat.destroy(true))
       victim.addChild(hitSplat)
 
@@ -573,7 +586,7 @@ window.onload = () => {
           shoot(attacker, attacker.info.xDirection)
           break
         case c.classes.mage.key:
-          attacker.body.velocity.y = -80
+          attacker.body.velocity.y = -85
           burnTeam(attacker, victim.info.team)
           break
         case c.classes.priest.key:
@@ -635,11 +648,16 @@ window.onload = () => {
     }
 
     function healHero (hero, healValue) {
+      if (hero.health === hero.maxHealth) {
+        // already max health
+        return
+      }
+      const roundedHealValue = Math.round(healValue)
       hero.heal(healValue)
       if (hero.health > hero.maxHealth) {
         hero.health = hero.maxHealth
       }
-      renderHitSplat(hero, '+' + healValue, {
+      renderHitSplat(hero, '+' + roundedHealValue, {
         fill: c.colors.green,
         stroke: c.colors.darkGreen
       }, 850)
@@ -649,11 +667,13 @@ window.onload = () => {
     function castAbility (caster, ability, abilityPerLevel) {
       switch (ability.name) {
         case 'heal_team':
+          caster.body.velocity.y = -80
           forEachAliveHero(caster.info.team, hero => {
             healHero(hero, ability.value + (abilityPerLevel.value * caster.combat.level))
           })
           break
       }
+      ability.timer = game.time.now + (ability.cooldown * Phaser.Timer.SECOND) * Math.pow(abilityPerLevel.cooldownMultiplier, caster.combat.level)
     }
 
     function walkAll (team) {
@@ -683,8 +703,9 @@ window.onload = () => {
     }
 
     const updateHero = (hero, index) => {
-      if (hero.combat.framesSinceDamageTaken > 320) {
-        hero.health += 0.18
+      if (this.game.time.now >= hero.combat.beginRegenAt) {
+        // console.info('regeny', hero.healthRegen)
+        healHero(hero, hero.healthRegen)
         hero.healthBar.setPercent(hero.health / hero.maxHealth * 100)
       }
       // hero.combat.attackTimer--
@@ -694,17 +715,18 @@ window.onload = () => {
           return ability
         })
       }
-      hero.combat.framesSinceDamageTaken++
+
       hero.body.velocity.x = 0
       hero.healthBar.setPosition(hero.x, hero.y - 14)
       hero.placesFromFront = index
 
       const passiveAbility = _.get(hero, ['abilities', 'passive'])
-      if (passiveAbility && passiveAbility.timer <= 0) {
-        // passive ability ready to use
-        const abilityPerLevel = _.get(hero, ['abilitiesPerLevel', 'passive'])
-        castAbility(hero, passiveAbility, abilityPerLevel)
-        passiveAbility.timer = passiveAbility.cooldown
+      if (passiveAbility) {
+        if (passiveAbility.timer <= this.game.time.now) {
+          // passive ability ready to use
+          const abilityPerLevel = _.get(hero, ['abilitiesPerLevel', 'passive'])
+          castAbility(hero, passiveAbility, abilityPerLevel)
+        }
       }
       if (hero.health > hero.maxHealth) hero.health = hero.maxHealth
     }
@@ -773,6 +795,9 @@ window.onload = () => {
         // focus camera on front player
         this.game.camera.focusOnXY(firstPlayer.x + (COMBAT_DISTANCE / 2 + HERO_WIDTH / 2), firstPlayer.y + 0)
         break
+      case 'dead':
+        gameOver()
+        return
     }
 
     switch (enemies.state) {
@@ -796,10 +821,15 @@ window.onload = () => {
     }
   }
 
+  function gameOver () {
+    console.info('game over')
+    game.state.start('Menu')
+  }
+
   function render () {
     // this.game.debug.geom(lineCameraMiddle, 'grey')
     this.game.debug.text(players.state, 5, 20, 'blue')
-    this.game.debug.text(enemies.state, this.game.camera.width - 180, 20, 'orange')
+    // this.game.debug.text(enemies.state, this.game.camera.width - 180, 20, 'orange')
     // this.game.debug.text(this.game.coins.bufferValue, this.game.camera.width / 2 - 50, 20, 'yellow')
   }
 }
