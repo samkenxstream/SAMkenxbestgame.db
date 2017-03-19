@@ -49,7 +49,7 @@ window.onload = () => {
   const onPlayerKilled = function () {
     if (this.getAllAliveUnits().length === 0) {
       // all players dead, this.game over
-      console.log('game over')
+      console.log('all dead, game over')
     }
   }
 
@@ -69,8 +69,6 @@ window.onload = () => {
   let players = {
     sprites: [
       c.classes.warrior.key,
-      c.classes.mage.key,
-      c.classes.priest.key,
     ],
     frontIndex: 0, // index of the player at the front, ready to attack
     state: 'idle', // 'idle', walking', 'fighting', swapping'
@@ -109,6 +107,7 @@ window.onload = () => {
 
     this.game.load.image('chest_closed', 'images/chest_closed.png')
     this.game.load.image('chest_open', 'images/chest_open.png')
+    this.game.stage.disableVisibilityChange = true
   }
 
   function createFighter (teamObject, {team, fighterClass, x, y, combatLevel = 0, maxHealth, placesFromFront, onKilled}) {
@@ -142,11 +141,6 @@ window.onload = () => {
       xDirection
     }
 
-    if (team === c.teams.player) {
-      fighter.inputEnabled = true
-      fighter.input.useHandCursor = placesFromFront > 0
-    }
-
     // Physics
     game.physics.arcade.enable(fighter)
     fighter.body.collideWorldBounds = true
@@ -178,6 +172,8 @@ window.onload = () => {
 
     let bar = { color: '#e2b100' }
     if (team === c.teams.player) {
+      fighter.inputEnabled = true
+      fighter.input.useHandCursor = placesFromFront > 0
       bar = { color: '#48ad05' }
       fighter.inputEnabled = true
       fighter.events.onInputDown.add(() => pushPlayerToFront(fighter.placesFromFront))
@@ -215,8 +211,6 @@ window.onload = () => {
   }
 
   function create () {
-    game.state.add('Menu', Menu)
-
     const createCoinsScore = () => {
       const coinsLabelStyle = {
         font: '28px Arial',
@@ -734,15 +728,22 @@ window.onload = () => {
     if (firstPlayer) {
       forEachAliveHero(players.sprites, updateHero, true)
     } else {
-      // this.game over
       players.state = 'dead'
-      // this.game.paused = true
-      return
     }
 
     if (firstEnemy) {
       forEachAliveHero(c.teams.enemy, updateHero, true)
+    } else {
+      enemies.state = 'dead'
+    }
 
+    if (firstPlayer && !firstEnemy) {
+      // no enemies, continue moving through the level
+      if (Math.abs(firstPlayer.bottom - this.game.world.height) < 2) {
+        // first player is on ground
+        players.state = 'walking'
+      }
+    } else if (firstPlayer && firstEnemy) {
       if (distBetweenHeroes(firstPlayer, firstEnemy) <= COMBAT_DISTANCE) {
         // heroes are in combat range
         players.state = 'fighting'
@@ -780,13 +781,6 @@ window.onload = () => {
         enemies.state = 'moving to fight'
         walkAll(c.teams.enemy)
       }
-    } else {
-      enemies.state = 'dead'
-      // no enemies, continue moving through the level
-      if (Math.abs(firstPlayer.bottom - this.game.world.height) < 2) {
-        // first player is on ground
-        players.state = 'walking'
-      }
     }
 
     switch (players.state) {
@@ -797,7 +791,8 @@ window.onload = () => {
         break
       case 'dead':
         gameOver()
-        return
+        this.game.paused = true
+        break
     }
 
     switch (enemies.state) {
@@ -821,9 +816,64 @@ window.onload = () => {
     }
   }
 
+  function renderEndMenu () {
+    const margin = 15
+
+    // menu bg
+    const menu = game.add.graphics()
+    const menuRect = {
+      x: game.world.centerX,
+      y: 0,
+      width: 220,
+      height: game.camera.height
+    }
+    const fillColor = c.colors.menu.bg.fill
+    const lineColor = c.colors.menu.bg.stroke
+    menu.beginFill(fillColor, 1)
+    menu.lineStyle(3, lineColor, 1)
+    menu.drawRect(menuRect.x - menuRect.width / 2, menuRect.y, menuRect.width, menuRect.height)
+
+    const coinIcon = game.add.sprite(game.world.centerX - menuRect.width / 3, game.world.centerY - menuRect.height / 4, 'collectible1')
+    coinIcon.scale.setTo(0.4)
+    coinIcon.anchor.setTo(0.5)
+
+    const coinsTextStyle = {
+      font: '28px Arial',
+      fill: '#ffff0b',
+      stroke: 'yellow',
+      strokeThickness: 1.7
+    }
+
+    const playAgainTextStyle = {
+      font: '22px Arial'
+    }
+    const coinText = game.make.text(coinIcon.width + margin, 0, game.coins.value.toString(), coinsTextStyle)
+    const coinText2 = game.make.text(coinIcon.width + coinText.width + margin * 4, 0, 'collected', _.assign({}, coinsTextStyle, {fill: '#eaeaea', strokeThickness: 0.8}))
+
+    coinText.anchor.y = 0.4
+    coinText2.anchor.y = 0.4
+    coinText.setScaleMinMax(1, 1)
+    coinText2.setScaleMinMax(1, 1)
+
+    coinIcon.addChild(coinText)
+    coinIcon.addChild(coinText2)
+    menu.addChild(coinIcon)
+
+    // play again button
+    const playAgainButton = game.make.text(game.world.centerX, game.world.centerY + menuRect.height / 4, 'Play Again', _.assign({}, coinsTextStyle, playAgainTextStyle))
+    playAgainButton.align = 'center'
+    playAgainButton.anchor.setTo(0.5)
+
+    menu.addChild(playAgainButton)
+
+    game.input.onDown.add(() => window.location.reload())
+  }
+
   function gameOver () {
+    game.paused = true
     console.info('game over')
-    game.state.start('Menu')
+    // game.input.onDown.add(() => {game.paused = false})
+    renderEndMenu()
   }
 
   function render () {

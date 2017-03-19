@@ -8,17 +8,18 @@ module.exports = () => ({
   },
   "classes": {
     "default": {
-      "maxHealth": 450,
+      "maxHealth": 8,
+      // "maxHealth": 450,
       "healthRegen": 1,
       "combat": {
         "range": 0,
-        "attackSpeed": 0.25,
+        "attackSpeed": .35,
         "minHitDamage": 30.0,
         "maxHitDamage": 60.0,
         "critChance": .15,
       },
       "combatPerLevel": {
-        "attackSpeed": 0.05,
+        "attackSpeed": .05,
         "minHitDamage": 5.0,
         "maxHitDamage": 5.0,
         "critChance": .01,
@@ -54,7 +55,7 @@ module.exports = () => ({
       "gravityModifier": .24,
       "combat": {
         "range": 1,
-        "attackSpeed": (.5 / 2.4),
+        "attackSpeed": (.35 / 2.0),
         "critChance": .1
       }
     },
@@ -101,6 +102,12 @@ module.exports = () => ({
     }
   },
   "colors": {
+    "menu": {
+      "bg": {
+        "fill": 0x222222,
+        "stroke": 0xbbbbbb
+      }
+    },
     "hitSplat": {
       "warrior": {
         "fill": 0xba0c0c,
