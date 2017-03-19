@@ -1,7 +1,7 @@
 /* global Phaser, HealthBar, _ */
 /* eslint-disable comma-dangle */
 
-const c = require('./constants.json')
+const c = require('./constants.js')()
 
 window.onload = function () {
   const MIN_TWITCH_WIDTH = 644
@@ -49,7 +49,7 @@ window.onload = function () {
   const onPlayerKilled = function () {
     if (this.getAllAliveUnits().length === 0) {
       // all players dead, game over
-      console.info('game over')
+      console.log('game over')
     }
   }
 
@@ -59,7 +59,7 @@ window.onload = function () {
       // last enemy killed
       // expand world to include another zone
       zone++
-      console.info('zone', zone)
+      console.log('zone', zone)
       const extraDistanceToNextFight = (5 / 7) * GAME_WIDTH // on top walking to the edge of the current zone
       game.world.resize(game.world.width + extraDistanceToNextFight, game.world.height)
     }
@@ -67,8 +67,8 @@ window.onload = function () {
 
   let players = {
     sprites: [
-      c.classes.priest.key,
-      c.classes.warrior.key,
+      c.classes.archer.key,
+      c.classes.archer.key,
       c.classes.archer.key,
       c.classes.mage.key,
     ],
@@ -114,7 +114,6 @@ window.onload = function () {
     game.load.spritesheet('flames', 'images/particles/animated/flames.png', 32, 40)
 
     game.load.image('collectable1', 'images/particles/gold_coin.gif')
-    game.load.image('collectable2', 'images/particles/gold_rock.png')
 
     game.load.image('chest_closed', 'images/chest_closed.png')
     game.load.image('chest_open', 'images/chest_open.png')
@@ -140,7 +139,6 @@ window.onload = function () {
     }
 
     fighter = game.add.sprite(x, y, c.classes[fighterClass].key + spriteSuffix)
-    if (fighterClass === c.classes.priest.key) console.info(baseClass.abilities)
     fighter.abilities = baseClass.abilities
     fighter.abilitiesPerLevel = baseClass.abilitiesPerLevel
 
@@ -181,7 +179,7 @@ window.onload = function () {
     const baseMaxHealth = baseClass.maxHealth || baseDefault.maxHealth
     fighter.maxHealth = Math.round(baseMaxHealth + (extraHealthPerLevel * combatLevel))
     fighter.health = fighter.maxHealth
-    console.info(`new ${fighter.info.team} with ${fighter.health} hp`)
+    console.log(`new ${fighter.info.team} ${fighter.info.fighterClass}, ${fighter.health} hp`)
 
     let bar = { color: '#e2b100' }
     if (team === c.teams.player) {
@@ -219,21 +217,22 @@ window.onload = function () {
     return fighter
   }
 
-  function particleBurst (pointer, count = 3, lifespan = 750) {
+  function particleBurst (pointer, count = 3, lifespan = 750, explode = true) {
     if (!_.isNumber(count)) count = 3
-    //  Position the emitter where the mouse/touch event was
+    if (lifespan == null || !_.isNumber(lifespan)) lifespan = 750
     coinEmitter.x = pointer.x
     coinEmitter.y = pointer.y
 
     //  The first parameter sets the effect to "explode" which means all particles are emitted at once
     //  The third argument is ignored when using burst/explode mode
     //  The final parameter (10) is how many particles will be emitted in this single burst
-    coinEmitter.start(true, lifespan, null, count)
+    coinEmitter.start(explode, lifespan, 180, count)
   }
 
   function create () {
     game.physics.startSystem(Phaser.Physics.ARCADE)
     game.time.advancedTiming = true // so we can read fps to calculate attack delays in seconds
+    game.time.slowMotion = 2.5
     background = game.add.tileSprite(0, 0, GAME_WIDTH, GAME_HEIGHT, 'background_1')
 
     displayGroup = game.add.group()
@@ -331,10 +330,10 @@ window.onload = function () {
     }, playersToShift[0].x)
 
     playerToPush.x = playerAtFrontX // move the player to the front
+    playerToPush.combat.attackTimer = playerAtFront.combat.attackTimer
     playerToPush.shiftToFront() // move the player to the front
     // the player being pushed to the front needs to wait to attack
     // this prevents a player from spam swapping their heroes to attack with each as often as possible
-    playerToPush.combat.attackTimer = playerAtFront.combat.attackTimer
 
     players.frontIndex = playerToPushIndex
   }
@@ -434,12 +433,15 @@ window.onload = function () {
 
     function burnTeam (attacker, targetTeam) {
       forEachAliveHero(targetTeam, victim => {
+        const y = victim.height / 2
+        console.info(victim.height, victim.body.height, y)
         const point = {
           x: -HERO_WIDTH / 2.5,
-          y: HERO_HEIGHT / 2 - 12
+          y
         }
         const fireSprite = game.make.sprite(point.x, point.y, 'flames')
         fireSprite.scale.setTo(1.5, 1)
+        fireSprite.anchor.setTo(0)
         fireSprite.lifespan = (1000 / attacker.combat.attackSpeed) / 1.7
         fireSprite.animations.add('flicker')
         fireSprite.animations.play('flicker', 10, true)
@@ -564,7 +566,7 @@ window.onload = function () {
 
       if (victim.info.team === c.teams.enemy) {
         // drop particles
-        particleBurst(victim, 2)
+        particleBurst(victim, 2, null, false)
       }
     }
 

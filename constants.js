@@ -1,4 +1,6 @@
-{
+/* eslint-disable */
+// keep this file in json syntax so it is easier later when we need it as a json
+module.exports = () => ({
   "teams": {
     "player": "player",
     "enemy": "enemy"
@@ -115,4 +117,4 @@
     "green": 0x0cc50c,
     "darkGreen": 0x0cac0c
   }
-}
+})
