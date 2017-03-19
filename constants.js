@@ -10,7 +10,7 @@ module.exports = () => ({
       "maxHealth": 45,
       "combat": {
         "range": 0,
-        "attackSpeed": 0.5,
+        "attackSpeed": 0.4,
         "minHitDamage": 3,
         "maxHitDamage": 6,
         "critChance": 0.15,
@@ -35,7 +35,7 @@ module.exports = () => ({
       "key": "archer",
       "combat": {
         "range": 2,
-        "attackSpeed": 0.42
+        "attackSpeed": 0.32
       },
       "combatPerLevel": {
         "attackSpeed": 0.11
@@ -56,7 +56,7 @@ module.exports = () => ({
       "maxHealth": 32,
       "combat": {
         "range": 0,
-        "attackSpeed": 0.75,
+        "attackSpeed": 0.65,
         "minHitDamage": 4,
         "maxHitDamage": 6,
         "critChance": 0

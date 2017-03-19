@@ -3,12 +3,12 @@
 
 const c = require('./constants.js')()
 
-window.onload = function () {
+window.onload = () => {
   const MIN_TWITCH_WIDTH = 644
   const GAME_WIDTH = MIN_TWITCH_WIDTH
   const GAME_HEIGHT = 125
 
-  const HERO_MOVEMENT_VELOCITY = 80
+  const HERO_MOVEMENT_VELOCITY = 75
   const HERO_WIDTH = 60
   const HERO_HEIGHT = 60
 
@@ -30,6 +30,10 @@ window.onload = function () {
     coinEmitter,
     displayGroup
   let zone = 0
+
+  const globals = {
+    coins: 0
+  }
 
   const getAllAliveUnits = function () {
     return _.filter(this.sprites, sprite => sprite.alive)
@@ -54,12 +58,13 @@ window.onload = function () {
   }
 
   const onEnemyKilled = function (enemy) {
-    particleBurst(enemy, 5)
+    dropCoins(enemy, 5)
     if (this.getAllAliveUnits().length === 0) {
       // last enemy killed
       // expand world to include another zone
+      console.log('zone complete')
       zone++
-      console.log('zone', zone)
+      console.log('advancing to zone', zone)
       const extraDistanceToNextFight = (5 / 7) * GAME_WIDTH // on top walking to the edge of the current zone
       game.world.resize(game.world.width + extraDistanceToNextFight, game.world.height)
     }
@@ -95,29 +100,29 @@ window.onload = function () {
 
   function preload () {
     // BACKGROUNDS
-    game.load.image('background_demo', 'images/background1.png')
-    game.load.image('background_1', 'images/backgrounds/grass.gif')
+    this.game.load.image('background_demo', 'images/background1.png')
+    this.game.load.image('background_1', 'images/backgrounds/grass.gif')
 
     // CHARACTERS
-    game.load.image('warrior_orange', 'images/characters/knight_orange_60x57.png')
-    // game.load.image('warrior_blue', 'images/characters/knight_blue_60x57.png')
-    game.load.image('warrior_blue', 'images/characters/warrior_kappa_60x.png')
-    game.load.image('archer_blue', 'images/characters/archer_blue_60x60.png')
-    game.load.image('archer_orange', 'images/characters/archer_orange_60x60.png')
-    game.load.image('mage_orange', 'images/characters/Trihard.png')
-    game.load.image('mage_blue', 'images/characters/Trihard.png')
-    game.load.image('priest_blue', 'images/characters/priest_feelsgood_60x75.png')
-    game.load.image('priest_orange', 'images/characters/priest_feelsgood_60x75.png')
+    this.game.load.image('warrior_orange', 'images/characters/knight_orange_60x57.png')
+    // this.game.load.image('warrior_blue', 'images/characters/knight_blue_60x57.png')
+    this.game.load.image('warrior_blue', 'images/characters/warrior_kappa_60x.png')
+    this.game.load.image('archer_blue', 'images/characters/archer_blue_60x60.png')
+    this.game.load.image('archer_orange', 'images/characters/archer_orange_60x60.png')
+    this.game.load.image('mage_orange', 'images/characters/Trihard.png')
+    this.game.load.image('mage_blue', 'images/characters/Trihard.png')
+    this.game.load.image('priest_blue', 'images/characters/priest_feelsgood_60x75.png')
+    this.game.load.image('priest_orange', 'images/characters/priest_feelsgood_60x75.png')
 
     // PARTICLES
-    game.load.image('arrow', 'images/particles/arrow.png')
-    game.load.spritesheet('flames', 'images/particles/animated/flames.png', 32, 40)
+    this.game.load.image('arrow', 'images/particles/arrow.png')
+    this.game.load.spritesheet('flames', 'images/particles/animated/flames.png', 32, 40)
 
-    game.load.image('collectable1', 'images/particles/gold_coin.gif')
+    this.game.load.image('collectable1', 'images/particles/gold_coin.gif')
 
-    game.load.image('chest_closed', 'images/chest_closed.png')
-    game.load.image('chest_open', 'images/chest_open.png')
-    game.load.image('chest_closed', 'images/chest_closed.png')
+    this.game.load.image('chest_closed', 'images/chest_closed.png')
+    this.game.load.image('chest_open', 'images/chest_open.png')
+    this.game.load.image('chest_closed', 'images/chest_closed.png')
   }
 
   function createFighter (teamObject, {team, fighterClass, x, y, combatLevel = 0, maxHealth, placesFromFront, onKilled}) {
@@ -217,7 +222,7 @@ window.onload = function () {
     return fighter
   }
 
-  function particleBurst (pointer, count = 3, lifespan = 750, explode = true) {
+  function dropCoins (pointer, count = 3, lifespan = 750, explode = true) {
     if (!_.isNumber(count)) count = 3
     if (lifespan == null || !_.isNumber(lifespan)) lifespan = 750
     coinEmitter.x = pointer.x
@@ -227,25 +232,26 @@ window.onload = function () {
     //  The third argument is ignored when using burst/explode mode
     //  The final parameter (10) is how many particles will be emitted in this single burst
     coinEmitter.start(explode, lifespan, 180, count)
+    game.time.events.add(lifespan + 90, () => { globals.coins += count }, this)
   }
 
   function create () {
-    game.physics.startSystem(Phaser.Physics.ARCADE)
-    game.time.advancedTiming = true // so we can read fps to calculate attack delays in seconds
-    game.time.slowMotion = 2.5
+    this.game.physics.startSystem(Phaser.Physics.ARCADE)
+    this.game.time.advancedTiming = true // so we can read fps to calculate attack delays in seconds
+    // game.time.slowMotion = 2.5
     background = game.add.tileSprite(0, 0, GAME_WIDTH, GAME_HEIGHT, 'background_1')
 
-    displayGroup = game.add.group()
+    displayGroup = this.game.add.group()
 
     // draw middle line for testing
     lineCameraMiddle = new Phaser.Line(0, 0, 0, GAME_HEIGHT)
 
-    const playerBaseX = game.world.centerX - (HERO_WIDTH / 2 + COMBAT_DISTANCE / 2)
+    const playerBaseX = this.game.world.centerX - (HERO_WIDTH / 2 + COMBAT_DISTANCE / 2)
     players.sprites = players.sprites.map((fighterClass, index) => createFighter(players, {
       team: c.teams.player,
       fighterClass,
       x: playerBaseX - DISTANCE_BETWEEN_HEROES * index,
-      y: game.world.height - HERO_HEIGHT,
+      y: this.game.world.height - HERO_HEIGHT,
       placesFromFront: index,
       onKilled: players.onHeroKilled,
       combatLevel: 2
@@ -278,10 +284,10 @@ window.onload = function () {
     projectiles.setAll('anchor.y', 1)
     projectiles.setAll('outOfBoundsKill', true)
 
-    // chest = game.add.sprite(game.world.width - 80, game.world.height - 60, 'chest_closed')
+    // chest = this.game.add.sprite(this.game.world.width - 80, this.game.world.height - 60, 'chest_closed')
     // chest.scale.setTo(0.8, 0.65)
 
-    coinEmitter = game.add.emitter(0, 0, 100) // max 100 coins at once
+    coinEmitter = this.game.add.emitter(0, 0, 100) // max 100 coins at once
     coinEmitter.maxParticleScale = 0.08
     coinEmitter.minParticleScale = 0.08
 
@@ -354,20 +360,20 @@ window.onload = function () {
     return enemy
   }
   window.spawn = function () {
-    spawnEnemy(...arguments)
+    spawnEnemy.apply(game, arguments)
   }
   function update () {
-    background.width = game.world.width
+    background.width = this.game.world.width
     // debugging
-    lineCameraMiddle.centerOn(getCameraCenterX(), game.world.height / 2)
-    const cursors = game.input.keyboard.createCursorKeys()
+    lineCameraMiddle.centerOn(getCameraCenterX(), this.game.world.height / 2)
+    const cursors = this.game.input.keyboard.createCursorKeys()
 
-    const distanceToNextFight = game.world.width - (game.camera.x + game.camera.width)
+    const distanceToNextFight = this.game.world.width - (this.game.camera.x + this.game.camera.width)
     const firstPlayer = players.getFirstAliveUnit()
     const firstEnemy = enemies.getFirstAliveUnit()
 
-    game.physics.arcade.overlap(enemies.sprites, projectiles, projectileHitsHero, null, this)
-    game.physics.arcade.overlap(players.sprites, projectiles, projectileHitsHero, null, this)
+    this.game.physics.arcade.overlap(enemies.sprites, projectiles, projectileHitsHero, null, this)
+    this.game.physics.arcade.overlap(players.sprites, projectiles, projectileHitsHero, null, this)
 
     function forEachAliveHero (heroTeam, execute, frontToBack = false) {
       let heroes
@@ -566,7 +572,7 @@ window.onload = function () {
 
       if (victim.info.team === c.teams.enemy) {
         // drop particles
-        particleBurst(victim, 2, null, false)
+        dropCoins(victim, 2, null, false)
       }
     }
 
@@ -650,7 +656,7 @@ window.onload = function () {
     } else {
       // game over
       players.state = 'dead'
-      // game.paused = true
+      // this.game.paused = true
       return
     }
 
@@ -694,7 +700,7 @@ window.onload = function () {
     } else {
       enemies.state = 'dead'
       // no enemies, continue moving through the level
-      if (Math.abs(firstPlayer.bottom - game.world.height) < 2) {
+      if (Math.abs(firstPlayer.bottom - this.game.world.height) < 2) {
         // first player is on ground
         players.state = 'walking'
 /*        const isOverlapping = (spriteA, spriteB) => {
@@ -709,7 +715,7 @@ window.onload = function () {
           firstPlayer.moveUp()
 
           enemies.state = '$ $ $ $ $ $'
-          // game.paused = true
+          // this.game.paused = true
         } else {
           // players.state = 'walking'
         }*/
@@ -720,7 +726,7 @@ window.onload = function () {
       case 'walking':
         walkAll(c.teams.player)
         // focus camera on front player
-        game.camera.focusOnXY(firstPlayer.x + (COMBAT_DISTANCE / 2 + HERO_WIDTH / 2), firstPlayer.y + 0)
+        this.game.camera.focusOnXY(firstPlayer.x + (COMBAT_DISTANCE / 2 + HERO_WIDTH / 2), firstPlayer.y + 0)
         break
     }
 
@@ -746,9 +752,10 @@ window.onload = function () {
   }
 
   function render () {
-    game.debug.geom(lineCameraMiddle, 'grey')
-    game.debug.text(players.state, 5, 20, 'blue')
-    game.debug.text(enemies.state, game.camera.width - 180, 20, 'orange')
+    this.game.debug.geom(lineCameraMiddle, 'grey')
+    this.game.debug.text(players.state, 5, 20, 'blue')
+    this.game.debug.text(enemies.state, this.game.camera.width - 180, 20, 'orange')
+    this.game.debug.text(globals.coins, this.game.camera.width / 2 - 50, 20, 'yellow')
   }
 }
 
