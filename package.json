@@ -4,7 +4,7 @@
   "description": "Players collect streamers to fight for them against the evil twitch emotes",
   "main": "game.js",
   "scripts": {
-    "start": "budo game.js --live --open --port 8000",
+    "start": "budo game.js --live --open --port 8000 --watch-glob **/*.{html,js,css}",
     "copy-files": "rm -rf ./build && mkdir build && cp index.html ./build && cp -r ./plugins ./build && cp -r ./images ./build",
     "bundle": "browserify --entry game.js --outfile ./build/game.js",
     "build": "npm run copy-files && npm run bundle",

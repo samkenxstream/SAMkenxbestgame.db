@@ -10,13 +10,13 @@ module.exports = () => ({
       "maxHealth": 45,
       "combat": {
         "range": 0,
-        "attackSpeed": 0.4,
+        "attackSpeed": 0.25,
         "minHitDamage": 3,
         "maxHitDamage": 6,
         "critChance": 0.15,
       },
       "combatPerLevel": {
-        "attackSpeed": 0.13,
+        "attackSpeed": 0.05,
         "minHitDamage": 0.5,
         "maxHitDamage": 0.5,
         "critChance": 0.01,
@@ -38,7 +38,7 @@ module.exports = () => ({
         "attackSpeed": 0.32
       },
       "combatPerLevel": {
-        "attackSpeed": 0.11
+        "attackSpeed": 0.05
       }
     },
     "mage": {
@@ -56,7 +56,7 @@ module.exports = () => ({
       "maxHealth": 32,
       "combat": {
         "range": 0,
-        "attackSpeed": 0.65,
+        "attackSpeed": 0.5,
         "minHitDamage": 4,
         "maxHitDamage": 6,
         "critChance": 0

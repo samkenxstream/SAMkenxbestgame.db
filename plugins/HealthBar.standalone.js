@@ -48,7 +48,7 @@ HealthBar.prototype.mergeWithDefaultConfiguration = function (newConfig) {
     bar: {
       color: '#48ad05'
     },
-    animationDuration: 200,
+    animationDuration: 700,
     flipped: false,
     isFixedToCamera: false
   }
@@ -73,6 +73,9 @@ HealthBar.prototype.drawBackground = function () {
   bmd.ctx.beginPath()
   bmd.ctx.rect(0, 0, this.config.width, this.config.height)
   bmd.ctx.fill()
+  bmd.ctx.strokeStyle = '#555'
+  bmd.ctx.lineWidth = 3
+  bmd.ctx.stroke()
 
   this.bgSprite = this.game.add.sprite(this.x, this.y, bmd)
   this.bgSprite.anchor.set(0.5)
@@ -88,6 +91,9 @@ HealthBar.prototype.drawHealthBar = function () {
   bmd.ctx.beginPath()
   bmd.ctx.rect(0, 0, this.config.width, this.config.height)
   bmd.ctx.fill()
+  bmd.ctx.strokeStyle = '#555'
+  bmd.ctx.lineWidth = 3
+  bmd.ctx.stroke()
 
   this.barSprite = this.game.add.sprite(this.x - this.bgSprite.width / 2, this.y, bmd)
   this.barSprite.anchor.y = 0.5

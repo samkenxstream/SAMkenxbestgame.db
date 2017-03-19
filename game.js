@@ -23,17 +23,12 @@ window.onload = () => {
     update,
     render
   })
-  let chest,
-    projectiles,
+  let projectiles,
     lineCameraMiddle,
     background,
     coinEmitter,
     displayGroup
   let zone = 0
-
-  const globals = {
-    coins: 0
-  }
 
   const getAllAliveUnits = function () {
     return _.filter(this.sprites, sprite => sprite.alive)
@@ -52,7 +47,7 @@ window.onload = () => {
 
   const onPlayerKilled = function () {
     if (this.getAllAliveUnits().length === 0) {
-      // all players dead, game over
+      // all players dead, this.game over
       console.log('game over')
     }
   }
@@ -73,9 +68,8 @@ window.onload = () => {
   let players = {
     sprites: [
       c.classes.archer.key,
+      c.classes.warrior.key,
       c.classes.archer.key,
-      c.classes.archer.key,
-      c.classes.mage.key,
     ],
     frontIndex: 0, // index of the player at the front, ready to attack
     state: 'idle', // 'idle', walking', 'fighting', swapping'
@@ -86,10 +80,7 @@ window.onload = () => {
 
   let enemies = {
     sprites: [
-      c.classes.priest.key,
-      c.classes.priest.key,
-      c.classes.priest.key,
-      c.classes.priest.key,
+      c.classes.warrior.key,
     ],
     frontIndex: 0, // index of the player at the front, ready to attack
     state: 'idle', // 'idle', walking', 'fighting', swapping'
@@ -100,29 +91,22 @@ window.onload = () => {
 
   function preload () {
     // BACKGROUNDS
-    this.game.load.image('background_demo', 'images/background1.png')
     this.game.load.image('background_1', 'images/backgrounds/grass.gif')
 
     // CHARACTERS
-    this.game.load.image('warrior_orange', 'images/characters/knight_orange_60x57.png')
-    // this.game.load.image('warrior_blue', 'images/characters/knight_blue_60x57.png')
-    this.game.load.image('warrior_blue', 'images/characters/warrior_kappa_60x.png')
-    this.game.load.image('archer_blue', 'images/characters/archer_blue_60x60.png')
-    this.game.load.image('archer_orange', 'images/characters/archer_orange_60x60.png')
-    this.game.load.image('mage_orange', 'images/characters/Trihard.png')
-    this.game.load.image('mage_blue', 'images/characters/Trihard.png')
-    this.game.load.image('priest_blue', 'images/characters/priest_feelsgood_60x75.png')
-    this.game.load.image('priest_orange', 'images/characters/priest_feelsgood_60x75.png')
+    this.game.load.image(c.classes.warrior.key, 'images/characters/warrior_kappa_60x.png')
+    this.game.load.image(c.classes.archer.key, 'images/characters/archer_emote_60x80.png')
+    this.game.load.image(c.classes.mage.key, 'images/characters/Trihard.png')
+    this.game.load.image(c.classes.priest.key, 'images/characters/priest_feelsgood_60x75.png')
 
     // PARTICLES
     this.game.load.image('arrow', 'images/particles/arrow.png')
     this.game.load.spritesheet('flames', 'images/particles/animated/flames.png', 32, 40)
 
-    this.game.load.image('collectable1', 'images/particles/gold_coin.gif')
+    this.game.load.image('collectible1', 'images/particles/gold_coin_v3.gif')
 
     this.game.load.image('chest_closed', 'images/chest_closed.png')
     this.game.load.image('chest_open', 'images/chest_open.png')
-    this.game.load.image('chest_closed', 'images/chest_closed.png')
   }
 
   function createFighter (teamObject, {team, fighterClass, x, y, combatLevel = 0, maxHealth, placesFromFront, onKilled}) {
@@ -130,20 +114,17 @@ window.onload = () => {
     const baseDefault = c.classes.default
     // numFromFront is the number
     let fighter
-    let spriteSuffix
     let xDirection
     let flipHorizontally = false
 
     if (team === c.teams.player) {
-      spriteSuffix = '_blue'
       xDirection = 1
       flipHorizontally = true
     } else if (team === c.teams.enemy) {
-      spriteSuffix = '_orange'
       xDirection = -1
     }
 
-    fighter = game.add.sprite(x, y, c.classes[fighterClass].key + spriteSuffix)
+    fighter = game.add.sprite(x, y, c.classes[fighterClass].key)
     fighter.abilities = baseClass.abilities
     fighter.abilitiesPerLevel = baseClass.abilitiesPerLevel
 
@@ -192,7 +173,7 @@ window.onload = () => {
       fighter.inputEnabled = true
       fighter.events.onInputDown.add(() => pushPlayerToFront(fighter.placesFromFront))
     }
-    fighter.healthBar = new HealthBar(game, {x: x - 4, y: y - 15, width: 50, height: 10, bar})
+    fighter.healthBar = new HealthBar(game, {x: x - 4, y: y - 15, width: 50, height: 8, bar})
 
     const baseStats = _.assign({}, baseDefault.combat, baseClass.combat, {
       attackTimer: 0,
@@ -222,32 +203,59 @@ window.onload = () => {
     return fighter
   }
 
-  function dropCoins (pointer, count = 3, lifespan = 750, explode = true) {
-    if (!_.isNumber(count)) count = 3
-    if (lifespan == null || !_.isNumber(lifespan)) lifespan = 750
-    coinEmitter.x = pointer.x
-    coinEmitter.y = pointer.y
-
-    //  The first parameter sets the effect to "explode" which means all particles are emitted at once
-    //  The third argument is ignored when using burst/explode mode
-    //  The final parameter (10) is how many particles will be emitted in this single burst
-    coinEmitter.start(explode, lifespan, 180, count)
-    game.time.events.add(lifespan + 90, () => { globals.coins += count }, this)
-  }
-
   function create () {
-    this.game.physics.startSystem(Phaser.Physics.ARCADE)
+    const createCoinsScore = () => {
+      const coinsLabelStyle = {
+        font: '28px Arial',
+        fill: '#ffff2b',
+        stroke: 'black',
+        strokeThickness: 2.3
+      }
+
+      // create the coins label
+      const coinsLabel = this.game.add.text(this.game.world.centerX, 0, '0', coinsLabelStyle)
+      const coinsLabelIcon = this.game.add.sprite(0, 0, 'collectible1')
+      coinsLabelIcon.scale.setTo(0.4)
+      coinsLabelIcon.anchor.setTo(1, 0)
+      coinsLabelIcon.x = -4
+      coinsLabelIcon.y = coinsLabel.height / 4
+
+      coinsLabel.anchor.setTo(0, 0)
+      coinsLabel.align = 'center'
+
+      coinsLabel.addChild(coinsLabelIcon)
+
+      this.game.world.bringToTop(coinsLabel)
+
+      // Create a tween to grow / shrink the coins label
+      const coinsLabelTween = this.game.add.tween(coinsLabel.scale).to({
+        x: 1.3,
+        y: 1.3
+      }, 120, Phaser.Easing.Linear.In).to({x: 1, y: 1}, 90, Phaser.Easing.Linear.In)
+      return {
+        value: 0,
+        bufferValue: 0,
+        label: coinsLabel,
+        labelIcon: coinsLabelIcon,
+        labelTween: coinsLabelTween,
+      }
+    }
+    background = this.game.add.tileSprite(0, 0, GAME_WIDTH, GAME_HEIGHT, 'background_1')
+
     this.game.time.advancedTiming = true // so we can read fps to calculate attack delays in seconds
-    // game.time.slowMotion = 2.5
-    background = game.add.tileSprite(0, 0, GAME_WIDTH, GAME_HEIGHT, 'background_1')
+    this.game.physics.startSystem(Phaser.Physics.ARCADE)
+
+    this.game.coins = createCoinsScore()
+    console.info(this.game.coins)
+
+    // debugging purposes
+    // this.game.time.slowMotion = 2.5
+    lineCameraMiddle = new Phaser.Line(0, 0, 0, GAME_HEIGHT)
 
     displayGroup = this.game.add.group()
 
-    // draw middle line for testing
-    lineCameraMiddle = new Phaser.Line(0, 0, 0, GAME_HEIGHT)
-
     const playerBaseX = this.game.world.centerX - (HERO_WIDTH / 2 + COMBAT_DISTANCE / 2)
-    players.sprites = players.sprites.map((fighterClass, index) => createFighter(players, {
+    players.sprites = players.sprites.map((fighterClass, index) => createFighter.call(this, players, {
       team: c.teams.player,
       fighterClass,
       x: playerBaseX - DISTANCE_BETWEEN_HEROES * index,
@@ -258,11 +266,11 @@ window.onload = () => {
     }))
 
     enemies.sprites = enemies.sprites.map((fighterClass, index) => {
-      const enemy = createFighter(enemies, {
+      const enemy = createFighter.call(this, enemies, {
         team: c.teams.enemy,
         fighterClass,
         x: ENEMY_BASE_X + DISTANCE_BETWEEN_HEROES * index,
-        y: game.world.height - HERO_HEIGHT,
+        y: this.game.world.height - HERO_HEIGHT,
         placesFromFront: index,
         onKilled: enemies.onHeroKilled
       })
@@ -270,7 +278,7 @@ window.onload = () => {
       return enemy
     })
 
-    projectiles = game.add.group()
+    projectiles = this.game.add.group()
     projectiles.enableBody = true
     projectiles.physicsBodyType = Phaser.Physics.ARCADE
 
@@ -284,21 +292,48 @@ window.onload = () => {
     projectiles.setAll('anchor.y', 1)
     projectiles.setAll('outOfBoundsKill', true)
 
-    // chest = this.game.add.sprite(this.game.world.width - 80, this.game.world.height - 60, 'chest_closed')
-    // chest.scale.setTo(0.8, 0.65)
-
     coinEmitter = this.game.add.emitter(0, 0, 100) // max 100 coins at once
-    coinEmitter.maxParticleScale = 0.08
-    coinEmitter.minParticleScale = 0.08
+    coinEmitter.maxParticleScale = 0.5
+    coinEmitter.minParticleScale = 0.5
 
     // spriteKey, frame, quantity, collide?, collideWorldBounds?
     // i think that the quantity chosen here restricts the max quantity generated in one call
-    coinEmitter.makeParticles('collectable1', 0, undefined, false, true)
-    coinEmitter.gravity = 380
-    displayGroup.add(coinEmitter, true)
+    coinEmitter.makeParticles('collectible1', 0, undefined, false, true)
+    coinEmitter.gravity = 600
+    const animateAddCoins = (coin) => {
+      if (!coin.alive) {
+        createCoinsIncrementAnimation(coin, 1)
+      }
+    }
+    coinEmitter.callAll('events.onKilled.add', 'events.onKilled', animateAddCoins)
+    this.game.world.bringToTop(coinEmitter)
   }
 
-  function getCameraCenterX () {
+  function createCoinsIncrementAnimation (coin, coinValue) {
+    coin.alive = true
+    coin.visible = true
+
+    // tween the coin to the total score label
+    const duration = 400
+
+    const coinTween = game.add.tween(coin).to({
+      x: game.coins.label.x,
+      y: game.coins.label.y
+    }, duration, Phaser.Easing.Exponential.In, true)
+
+    game.add.tween(coin).to({alpha: 0.3}, duration * 0.85, Phaser.Easing.Exponential.In, true)
+
+    // when animation finishes:
+    // destroy score label
+    // trigger the total score labels animation
+    coinTween.onComplete.add(function () {
+      coin.destroy()
+      game.coins.labelTween.start()
+      game.coins.bufferValue += coinValue
+    }, game)
+  }
+
+  const getCameraCenterX = () => {
     return game.camera.width / 2 + game.camera.x
   }
 
@@ -346,7 +381,7 @@ window.onload = () => {
 
   function spawnEnemy (placesFromFront = 0, combatLevel = 0, fighterClass = c.classes.warrior.key) {
     const x = getCameraCenterX() + (HERO_WIDTH / 2) + (COMBAT_DISTANCE / 2) + 1
-    const enemy = createFighter(enemies, {
+    const enemy = createFighter.call(game, enemies, {
       team: c.teams.enemy,
       combatLevel,
       fighterClass,
@@ -362,10 +397,36 @@ window.onload = () => {
   window.spawn = function () {
     spawnEnemy.apply(game, arguments)
   }
+
+  function dropCoins (pointer, count = 3, lifespan = 750, explode = true) {
+    if (!_.isNumber(count)) count = 3
+    if (lifespan == null || !_.isNumber(lifespan)) lifespan = 750
+    coinEmitter.x = pointer.x
+    coinEmitter.y = pointer.y
+
+    //  The first parameter sets the effect to "explode" which means all particles are emitted at once
+    //  The third argument is ignored when using burst/explode mode
+    //  The final parameter (10) is how many particles will be emitted in this single burst
+    coinEmitter.start(explode, lifespan, 180, count)
+  }
+
   function update () {
     background.width = this.game.world.width
+
+    this.game.coins.label.x = getCameraCenterX()
+    const coinBuffer = this.game.coins.bufferValue
+    if (coinBuffer > 0) {
+      if (coinBuffer > 50) {
+        this.game.coins.value += 5
+      } else {
+        this.game.coins.value += 1
+      }
+      this.game.coins.label.text = this.game.coins.value.toString()
+      this.game.coins.bufferValue--
+    }
+
     // debugging
-    lineCameraMiddle.centerOn(getCameraCenterX(), this.game.world.height / 2)
+    lineCameraMiddle.centerOn(getCameraCenterX.call(this), this.game.world.height / 2)
     const cursors = this.game.input.keyboard.createCursorKeys()
 
     const distanceToNextFight = this.game.world.width - (this.game.camera.x + this.game.camera.width)
@@ -375,7 +436,7 @@ window.onload = () => {
     this.game.physics.arcade.overlap(enemies.sprites, projectiles, projectileHitsHero, null, this)
     this.game.physics.arcade.overlap(players.sprites, projectiles, projectileHitsHero, null, this)
 
-    function forEachAliveHero (heroTeam, execute, frontToBack = false) {
+    const forEachAliveHero = (heroTeam, execute, frontToBack = false) => {
       let heroes
       if (heroTeam instanceof Array) {
         heroes = heroTeam
@@ -402,17 +463,6 @@ window.onload = () => {
       return Phaser.Math.difference(hero1.body.x, hero2.body.x) - HERO_WIDTH
     }
 
-    function projectileHitsHero (victim, projectile) {
-      if (projectile.info.team !== victim.info.team) {
-        // projectile hit a hero and it is not friendly fire
-        // if (vic)
-        if (Math.abs(projectile.body.overlapX) > 30) {
-          dealDamage(projectile.shooter, victim)
-          projectile.kill()
-        }
-      }
-    }
-
     function shoot (shooter, xDirection, projectileType = c.projectiles.arrow.key) {
       const projectile = projectiles.getFirstDead()
       let projectileX = shooter.x + 18 * xDirection
@@ -437,15 +487,14 @@ window.onload = () => {
       }
     }
 
-    function burnTeam (attacker, targetTeam) {
+    const burnTeam = (attacker, targetTeam) => {
       forEachAliveHero(targetTeam, victim => {
         const y = victim.height / 2
-        console.info(victim.height, victim.body.height, y)
         const point = {
           x: -HERO_WIDTH / 2.5,
           y
         }
-        const fireSprite = game.make.sprite(point.x, point.y, 'flames')
+        const fireSprite = this.game.make.sprite(point.x, point.y, 'flames')
         fireSprite.scale.setTo(1.5, 1)
         fireSprite.anchor.setTo(0)
         fireSprite.lifespan = (1000 / attacker.combat.attackSpeed) / 1.7
@@ -455,71 +504,6 @@ window.onload = () => {
         victim.addChild(fireSprite)
         dealDamage(attacker, victim)
       })
-    }
-
-    function attackHero (attacker, victim) {
-      switch (attacker.info.fighterClass) {
-        case c.classes.warrior.key:
-          // attack animation
-          attacker.body.velocity.y = -110
-          dealDamage(attacker, victim)
-          break
-        case c.classes.archer.key:
-          attacker.body.velocity.y = -170
-          shoot(attacker, attacker.info.xDirection)
-          break
-        case c.classes.mage.key:
-          attacker.body.velocity.y = -80
-          burnTeam(attacker, victim.info.team)
-          break
-        case c.classes.priest.key:
-          attacker.body.velocity.y = -90
-          dealDamage(attacker, victim)
-          break
-      }
-      // damage the victim
-
-      // delay until next attack
-      const fps = game.time.fps === 1 ? 60 : game.time.fps
-      attacker.combat.attackTimer = fps / attacker.combat.attackSpeed
-    }
-
-    function renderHitSplat (hero, text, style, lifespan) {
-      // render a hit splat
-      const hitSplat = game.add.graphics()
-
-      const fillColor = style.fill
-      const lineColor = style.stroke
-      hitSplat.beginFill(fillColor, 1)
-      hitSplat.lineStyle(3, lineColor, 1)
-
-      const rect = {
-        x: -20,
-        y: 20,
-        width: 36,
-        height: 20
-      }
-      hitSplat.drawRect(rect.x, rect.y, rect.width, rect.height)
-
-      const splatTextStyle = {
-        fill: 'white',
-        fontSize: '20px',
-        boundsAlignH: 'center'
-      }
-      const hitText = game.make.text(-10, rect.y - 3, text.toString(), splatTextStyle)
-      hitText.setTextBounds(-30, 3, 80, 30)
-
-      hitSplat.addChild(hitText)
-      if (hero.info.team === c.teams.player) {
-        hitSplat.scale.x *= -1
-      }
-      hitSplat.lifespan = lifespan
-      hitSplat.events.onKilled.add(() => hitSplat.destroy(true))
-      hero.addChild(hitSplat)
-    }
-
-    function updateHealthBar (hero, healthBar) {
-      healthBar.setPercent(hero.health / hero.maxHealth * 100)
     }
 
     function dealDamage (attacker, victim) {
@@ -545,7 +529,7 @@ window.onload = () => {
 
       const rect = {
         x: -20,
-        y: damage.critical ? 21 : 20,
+        y: victim.height / 2.5,
         width: 36,
         height: 20
       }
@@ -574,6 +558,80 @@ window.onload = () => {
         // drop particles
         dropCoins(victim, 2, null, false)
       }
+    }
+
+    const attackHero = (attacker, victim) => {
+      // perform attack based on class
+      switch (attacker.info.fighterClass) {
+        case c.classes.warrior.key:
+          // attack animation
+          attacker.body.velocity.y = -125
+          dealDamage.call(this, attacker, victim)
+          break
+        case c.classes.archer.key:
+          attacker.body.velocity.y = -170
+          shoot(attacker, attacker.info.xDirection)
+          break
+        case c.classes.mage.key:
+          attacker.body.velocity.y = -80
+          burnTeam(attacker, victim.info.team)
+          break
+        case c.classes.priest.key:
+          attacker.body.velocity.y = -105
+          dealDamage.call(this, attacker, victim)
+          break
+      }
+
+      attacker.combat.attackTimer = game.time.now + (1 / attacker.combat.attackSpeed) * 1000
+    }
+
+    const renderHitSplat = (hero, text, style, lifespan) => {
+      // render a hit splat
+      const hitSplat = this.game.add.graphics()
+
+      const fillColor = style.fill
+      const lineColor = style.stroke
+      hitSplat.beginFill(fillColor, 1)
+      hitSplat.lineStyle(3, lineColor, 1)
+
+      const rect = {
+        x: -20,
+        y: 20,
+        width: 36,
+        height: 20
+      }
+      hitSplat.drawRect(rect.x, rect.y, rect.width, rect.height)
+
+      const splatTextStyle = {
+        fill: 'white',
+        fontSize: '20px',
+        boundsAlignH: 'center'
+      }
+      const hitText = this.game.make.text(-10, rect.y - 3, text.toString(), splatTextStyle)
+      hitText.setTextBounds(-30, 3, 80, 30)
+
+      hitSplat.addChild(hitText)
+      if (hero.info.team === c.teams.player) {
+        hitSplat.scale.x *= -1
+      }
+      hitSplat.lifespan = lifespan
+      hitSplat.events.onKilled.add(() => hitSplat.destroy(true))
+      hero.addChild(hitSplat)
+    }
+
+    function projectileHitsHero (victim, projectile) {
+      if (projectile.info.team !== victim.info.team) {
+        // projectile hit a hero and it is not friendly fire
+        // if (vic)
+        if (Math.abs(projectile.body.overlapX) > 30) {
+          dealDamage(projectile.shooter, victim)
+          projectile.kill()
+        }
+      }
+    }
+
+    function updateHealthBar (hero, healthBar) {
+      healthBar.setPercent(hero.health / hero.maxHealth * 100)
     }
 
     function healHero (hero, healValue) {
@@ -617,7 +675,7 @@ window.onload = () => {
       forEachAliveHero(team, executeOnHero)
     }
 
-    function distanceToMiddle (sprite) {
+    const distanceToMiddle = (sprite) => {
       return Math.min(
         Math.abs(sprite.left - getCameraCenterX()),
         Math.abs(sprite.right - getCameraCenterX())
@@ -629,7 +687,7 @@ window.onload = () => {
         hero.health += 0.18
         hero.healthBar.setPercent(hero.health / hero.maxHealth * 100)
       }
-      hero.combat.attackTimer--
+      // hero.combat.attackTimer--
       if (hero.abilities) {
         hero.abilities = _.mapValues(hero.abilities, ability => {
           ability.timer--
@@ -654,7 +712,7 @@ window.onload = () => {
     if (firstPlayer) {
       forEachAliveHero(players.sprites, updateHero, true)
     } else {
-      // game over
+      // this.game over
       players.state = 'dead'
       // this.game.paused = true
       return
@@ -666,21 +724,24 @@ window.onload = () => {
       if (distBetweenHeroes(firstPlayer, firstEnemy) <= COMBAT_DISTANCE) {
         // heroes are in combat range
         players.state = 'fighting'
-        enemies.state = 'fighting'
-        // all heroes attack if they are in range
+
         forEachAliveHero(c.teams.player, (hero, index) => {
           if (hero.placesFromFront <= hero.combat.range) {
             // this hero can attack from a distance
-            if (hero.combat.attackTimer <= 0) {
-              attackHero(hero, firstEnemy)
+            if (hero.combat.attackTimer <= game.time.now) {
+              attackHero.call(this, hero, firstEnemy)
             }
           }
         }, true)
+
+        enemies.state = 'fighting'
+
         forEachAliveHero(c.teams.enemy, (hero, index) => {
           if (hero.placesFromFront <= hero.combat.range) {
             // this hero is in range to attack
-            if (hero.combat.attackTimer <= 0) {
-              attackHero(hero, firstPlayer)
+            // console.info('atk del', hero.combat.attackTimer)
+            if (hero.combat.attackTimer <= game.time.now) {
+              attackHero.call(this, hero, firstPlayer)
             }
           }
         }, true)
@@ -703,22 +764,6 @@ window.onload = () => {
       if (Math.abs(firstPlayer.bottom - this.game.world.height) < 2) {
         // first player is on ground
         players.state = 'walking'
-/*        const isOverlapping = (spriteA, spriteB) => {
-          const boundsA = spriteA.getBounds()
-          const boundsB = spriteB.getBounds()
-          boundsA.width = boundsA.width + 35
-          return Phaser.Rectangle.intersects(boundsA, boundsB)
-        }
-        if (isOverlapping(firstPlayer, chest)) {
-          chest.loadTexture('chest_open')
-          chest.anchor.setTo(0.1, 0.3)
-          firstPlayer.moveUp()
-
-          enemies.state = '$ $ $ $ $ $'
-          // this.game.paused = true
-        } else {
-          // players.state = 'walking'
-        }*/
       }
     }
 
@@ -739,7 +784,7 @@ window.onload = () => {
         }
     }
 
-    displayGroup.sort('z', Phaser.Group.SORT_DESCENDING)
+    // displayGroup.sort('z', Phaser.Group.SORT_DESCENDING)
 
     // keyboard movement for testing purposes
     if (cursors.left.isDown) {
@@ -752,10 +797,10 @@ window.onload = () => {
   }
 
   function render () {
-    this.game.debug.geom(lineCameraMiddle, 'grey')
+    // this.game.debug.geom(lineCameraMiddle, 'grey')
     this.game.debug.text(players.state, 5, 20, 'blue')
     this.game.debug.text(enemies.state, this.game.camera.width - 180, 20, 'orange')
-    this.game.debug.text(globals.coins, this.game.camera.width / 2 - 50, 20, 'yellow')
+    // this.game.debug.text(this.game.coins.bufferValue, this.game.camera.width / 2 - 50, 20, 'yellow')
   }
 }
 
