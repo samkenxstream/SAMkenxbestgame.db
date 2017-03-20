@@ -59,7 +59,7 @@ module.exports = () => ({
     },
     "mage": {
       "key": "mage",
-      "maxHealth": 180,
+      "maxHealth": 200,
       "gravityModifier": .24,
       "combat": {
         "range": 1,
@@ -69,7 +69,7 @@ module.exports = () => ({
     },
     "priest": {
       "key": "priest",
-      "maxHealth": 240,
+      "maxHealth": 180,
       "gravityModifier": .6,
       "combat": {
         "range": 0,

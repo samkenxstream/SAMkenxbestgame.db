@@ -81,9 +81,9 @@ window.onload = () => {
 
   const players = {
     sprites: [
+      c.classes.mage.key,
       c.classes.warrior.key,
       c.classes.archer.key,
-      c.classes.mage.key,
     ],
     frontIndex: 0, // index of the player at the front, ready to attack
     state: 'idle', // 'idle', walking', c.states.fighting, swapping'
@@ -489,7 +489,17 @@ window.onload = () => {
     players.frontIndex = playerToPushIndex
   }
 
-  function spawnEnemy (placesFromFront = 0, combatLevel = 0, fighterClass = c.classes.warrior.key) {
+  function spawnEnemy (placesFromFront = 0, combatLevel = 0, fighterClass) {
+    if (!fighterClass) {
+      // pick a random class
+      const classes = _.values(c.classes)
+      const randomClass = classes[_.random(0, _.size(c.classes) - 1)]
+      if (!randomClass.key) {
+        fighterClass = c.classes.warrior.key
+      } else {
+        fighterClass = randomClass.key
+      }
+    }
     const x = getCameraCenterX() + (HERO_WIDTH / 2) + (COMBAT_DISTANCE / 2) + 1
     const enemy = createFighter.call(game, enemies, {
       team: c.teams.enemy,
@@ -1091,7 +1101,7 @@ window.onload = () => {
 
   function render () {
     // this.game.debug.geom(lineCameraMiddle, 'grey')
-    this.game.debug.text(players.state, 5, 20, 'blue')
+    // this.game.debug.text(players.state, 5, 20, 'blue')
     // this.game.debug.text(enemies.state, this.game.camera.width - 180, 20, 'orange')
     // this.game.debug.text(this.game.coins.bufferValue, this.game.camera.width / 2 - 50, 20, 'yellow')
   }
