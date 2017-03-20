@@ -263,7 +263,8 @@ window.onload = () => {
         labelTween: coinsLabelTween,
       }
     }
-    background = this.game.add.tileSprite(0, 0, GAME_WIDTH, GAME_HEIGHT, 'background_1')
+    game.stage.backgroundColor = '#dddddd'
+    // background = this.game.add.tileSprite(0, 0, GAME_WIDTH, GAME_HEIGHT, 'background_1')
 
     this.game.time.advancedTiming = true // so we can read fps to calculate attack delays in seconds
     this.game.physics.startSystem(Phaser.Physics.ARCADE)
@@ -325,8 +326,8 @@ window.onload = () => {
     projectiles.setAll('outOfBoundsKill', true)
 
     coinEmitter = this.game.add.emitter(0, 0, 100) // max 100 coins at once
-    coinEmitter.maxParticleScale = 0.5
-    coinEmitter.minParticleScale = 0.5
+    coinEmitter.maxParticleScale = 0.4
+    coinEmitter.minParticleScale = 0.4
 
     // spriteKey, frame, quantity, collide?, collideWorldBounds?
     // i think that the quantity chosen here restricts the max quantity generated in one call
@@ -673,7 +674,7 @@ window.onload = () => {
   }
 
   function update () {
-    background.width = this.game.world.width
+    // background.width = this.game.world.width
 
     this.game.coins.label.x = getCameraCenterX()
     const coinBuffer = this.game.coins.bufferValue
