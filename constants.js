@@ -1,7 +1,7 @@
 /* eslint-disable */
 // keep this file in json syntax so it is easier later when we need it as a json
 module.exports = () => ({
-  "HEALTH_REGEN_DELAY": 6.0,
+  "HEALTH_REGEN_DELAY": 7.5,
   "teams": {
     "player": "player",
     "enemy": "enemy"

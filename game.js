@@ -294,7 +294,7 @@ window.onload = () => {
       y: this.game.world.height - HERO_HEIGHT,
       placesFromFront: index,
       onKilled: players.onHeroKilled,
-      combatLevel: 0
+      combatLevel: 2
     }))
 
     enemies.sprites = enemies.sprites.map((fighterClass, index) => {
