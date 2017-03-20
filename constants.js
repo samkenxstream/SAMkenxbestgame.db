@@ -6,17 +6,25 @@ module.exports = () => ({
     "player": "player",
     "enemy": "enemy"
   },
+  "states": {
+    "walking": "walking",
+    "fighting": "fighting",
+    "swapping": "swapping - shouldnt stay on this state",
+    "regrouping": "moving to fight",
+    "waitingOnEnemy": "waiting for enemy",
+    "openingChest": "opening a chest!",
+    "dead": "dead"
+  },
   "classes": {
     "default": {
-      "maxHealth": 8,
-      // "maxHealth": 450,
+      "maxHealth": 300,
       "healthRegen": 1,
       "combat": {
         "range": 0,
         "attackSpeed": .35,
         "minHitDamage": 30.0,
         "maxHitDamage": 60.0,
-        "critChance": .15,
+        "critChance": .12,
       },
       "combatPerLevel": {
         "attackSpeed": .05,
@@ -25,7 +33,7 @@ module.exports = () => ({
         "critChance": .01,
       },
       "extraPerLevel": {
-        "health": 4.7
+        "health": 47
       }
     },
     "warrior": {
@@ -43,31 +51,31 @@ module.exports = () => ({
       "key": "archer",
       "combat": {
         "range": 2,
-        "attackSpeed": .32
+        "attackSpeed": (.35 / 1.3)
       },
       "combatPerLevel": {
-        "attackSpeed": .05
+        "attackSpeed": .04
       }
     },
     "mage": {
       "key": "mage",
-      "maxHealth": 240,
+      "maxHealth": 180,
       "gravityModifier": .24,
       "combat": {
         "range": 1,
-        "attackSpeed": (.35 / 2.0),
+        "attackSpeed": (.35 / 1.8),
         "critChance": .1
       }
     },
     "priest": {
       "key": "priest",
-      "maxHealth": 320,
-      "gravityModifier": .4,
+      "maxHealth": 240,
+      "gravityModifier": .6,
       "combat": {
         "range": 0,
-        "attackSpeed": 0.9,
+        "attackSpeed": 0.6,
         "minHitDamage": 30.0,
-        "maxHitDamage": 50.0,
+        "maxHitDamage": 45.0,
         "critChance": 0
       },
       "combatPerLevel": {
@@ -132,5 +140,13 @@ module.exports = () => ({
     },
     "green": 0x0cc50c,
     "darkGreen": 0x0cac0c
+  },
+  "sizes": {
+    "reward": {
+      "width": 104
+    }
+  },
+  "delays": {
+    "autoClick": 3800
   }
 })

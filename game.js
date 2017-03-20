@@ -8,7 +8,7 @@ window.onload = () => {
   const GAME_WIDTH = MIN_TWITCH_WIDTH
   const GAME_HEIGHT = 125
 
-  const HERO_MOVEMENT_VELOCITY = 75
+  const HERO_MOVEMENT_VELOCITY = 80
   const HERO_WIDTH = 60
   const HERO_HEIGHT = 60
 
@@ -23,12 +23,13 @@ window.onload = () => {
     update,
     render
   })
-  const Menu = require('./Menu.js')(game)
+
   let projectiles,
     lineCameraMiddle,
     background,
     coinEmitter,
-    displayGroup
+    displayGroup,
+    chest
   let zone = 0
 
   const getAllAliveUnits = function () {
@@ -48,10 +49,14 @@ window.onload = () => {
 
   const onPlayerKilled = function () {
     if (this.getAllAliveUnits().length === 0) {
-      // all players dead, this.game over
-      console.log('all dead, game over')
+      // all players dead, game over
+      console.info('all dead, game over')
     }
   }
+
+  // reward at zone 3, 6, 9, ... (every 3 zones)
+  // reward appears at the end of the current zone
+  const isRewardZone = (zone) => (zone > 0) && (zone % 3 === 0)
 
   const onEnemyKilled = function (enemy) {
     dropCoins(enemy, 5)
@@ -63,27 +68,37 @@ window.onload = () => {
       console.log('advancing to zone', zone)
       const extraDistanceToNextFight = (5 / 7) * GAME_WIDTH // on top walking to the edge of the current zone
       game.world.resize(game.world.width + extraDistanceToNextFight, game.world.height)
+      if (isRewardZone(zone)) {
+        // spawn a reward chest at the end of the zone
+        console.info('new chest')
+        chest = game.add.sprite(getCameraCenterX() + game.camera.width / 2 - 20, game.world.height / 2 - 4, 'chest_closed')
+        chest.foundChest = _.once(foundChestSaga)
+        chest.scale.setTo(0.9, 0.63)
+        game.physics.arcade.enable(chest)
+      }
     }
   }
 
-  let players = {
+  const players = {
     sprites: [
       c.classes.warrior.key,
+      c.classes.archer.key,
+      c.classes.mage.key,
     ],
     frontIndex: 0, // index of the player at the front, ready to attack
-    state: 'idle', // 'idle', walking', 'fighting', swapping'
+    state: 'idle', // 'idle', walking', c.states.fighting, swapping'
     getAllAliveUnits,
     getFirstAliveUnit,
     onHeroKilled: onPlayerKilled
   }
 
-  let enemies = {
+  const enemies = {
     sprites: [
-      c.classes.mage.key,
       c.classes.warrior.key,
+      c.classes.priest.key,
     ],
     frontIndex: 0, // index of the player at the front, ready to attack
-    state: 'idle', // 'idle', walking', 'fighting', swapping'
+    state: 'idle', // 'idle', walking', c.states.fighting, swapping'
     getAllAliveUnits,
     getFirstAliveUnit,
     onHeroKilled: onEnemyKilled
@@ -107,6 +122,7 @@ window.onload = () => {
 
     this.game.load.image('chest_closed', 'images/chest_closed.png')
     this.game.load.image('chest_open', 'images/chest_open.png')
+    this.game.load.image('reward_coins', 'images/rewards/coins_25.png')
     this.game.stage.disableVisibilityChange = true
   }
 
@@ -252,12 +268,21 @@ window.onload = () => {
     this.game.time.advancedTiming = true // so we can read fps to calculate attack delays in seconds
     this.game.physics.startSystem(Phaser.Physics.ARCADE)
 
-    this.game.coins = createCoinsScore()
-    console.info(this.game.coins)
+    if (chest) {
+      this.game.physics.arcade.enable(chest)
+    }
 
-    // debugging purposes
+    this.game.coins = createCoinsScore()
+
+    // TESTING PURPOSES
+    window.suicide = () => {
+      _.forEach(players.sprites, player => {
+        player.damage(player.health)
+      })
+    }
     // this.game.time.slowMotion = 2.5
     lineCameraMiddle = new Phaser.Line(0, 0, 0, GAME_HEIGHT)
+    // END OF TESTING CODE
 
     displayGroup = this.game.add.group()
 
@@ -323,7 +348,7 @@ window.onload = () => {
     // menu bg
     const menu = game.make.graphics()
     const menuRect = {
-      x: game.world.centerX,
+      x: getCameraCenterX(),
       y: 0,
       width: 185,
       height: game.camera.height - menuMargin * 2
@@ -404,7 +429,9 @@ window.onload = () => {
       y: game.coins.label.y
     }, duration, Phaser.Easing.Exponential.In, true)
 
-    game.add.tween(coin).to({alpha: 0.3}, duration * 0.85, Phaser.Easing.Exponential.In, true)
+    game.add.tween(coin).to({
+      alpha: 0.3
+    }, duration * 0.85, Phaser.Easing.Exponential.In, true)
 
     // when animation finishes:
     // destroy score label
@@ -431,12 +458,12 @@ window.onload = () => {
     }
     const playerToPushIndex = players.sprites.findIndex(player => player.placesFromFront === placesFromFront)
     const playerToPush = players.sprites[playerToPushIndex]
-    if (!playerToPush) {
-      console.error('BIG PROBLEM - placesFromFront')
+    if (!playerToPush.alive) {
+      console.error('BIG PROBLEM - pushPlayerToFront')
       return
     }
 
-    players.state = 'swapping'
+    players.state = c.states.swapping
 
     const playerAtFront = players.getFirstAliveUnit()
     const playerAtFrontX = playerAtFront.x
@@ -491,6 +518,148 @@ window.onload = () => {
     //  The third argument is ignored when using burst/explode mode
     //  The final parameter (10) is how many particles will be emitted in this single burst
     coinEmitter.start(explode, lifespan, 180, count)
+  }
+
+  function foundChestSaga () {
+    console.info('found chest--', players.state, chest.x, players.sprites[0].x)
+    const rewards = game.add.group()
+
+    // store players velocities
+    const resumeVelocities = {}
+    players.sprites.forEach((player, index) => {
+      if (player.alive) {
+        // store velocity for later
+        resumeVelocities[index] = _.cloneDeep(player.body.velocity)
+        // set player velocity to zero (like pausing game, but tweens/animations are still played)
+        player.body.velocity.setTo(0)
+      }
+    })
+    // tween chest to center of screen
+    const tweenOptions = [
+      1500, // duration
+      Phaser.Easing.Exponential.Out, // easing
+      true, // auto start
+      35 // delay before start
+    ]
+    const centerChestTween = game.add.tween(chest).to({
+      x: getCameraCenterX(),
+      y: game.camera.centerY
+    }, ...tweenOptions)
+    game.add.tween(chest.anchor).to({
+      x: 0.5,
+      y: 0.4
+    }, ...tweenOptions)
+    game.add.tween(chest.scale).to({
+      x: 1.1,
+      y: 0.82
+    }, ...tweenOptions)
+
+    chest.inputEnabled = true
+    chest.input.useHandCursor = true
+
+    function openChest () {
+      // open chest animation
+      shakeXTween.stop()
+      shakeYTween.stop()
+      chest.loadTexture('chest_open')
+      chest.anchor.x = 0.35
+      chest.alpha = 0.8
+      chest.useHandCursor = false
+      chest.inputEnabled = false
+
+      // spawn rewards
+      rewards.add(rewardSprite(0))
+      rewards.add(rewardSprite(1))
+      // onComplete --> tween rewards to middle camera Y -- and calculated x positions (maybe I can use a group anchor 0.5,0.5 and the tween to will just work)
+
+      rewards.setAll('inputEnabled', true)
+      rewards.setAll('input.useHandCursor', true)
+      rewards.forEach(reward => {
+        reward.events.onInputDown.addOnce(reward.takeReward)
+      })
+
+      // kill the chest when the last reward is taken
+      rewards.callAll('events.onDestroy.add', 'events.onDestroy', () => {
+        if (rewards.countLiving() === 1) {
+          // the last reward was being destroyed
+          rewards.destroy()
+          chest.destroy()
+        }
+      })
+
+      // after showing the rewards for some time, take all the remaining rewards automatically
+      game.time.events.add(Phaser.Timer.SECOND * 4, () => {
+        // take all rewards not yet taken
+        let i = 0
+        rewards.forEachExists(reward => {
+          // delay between taking each reward
+          game.time.events.add(Phaser.Timer.SECOND * 0.5 * i, () => {
+            reward.takeReward()
+          })
+          i++
+        })
+
+        // set player velocities back to stored values
+        players.sprites.forEach((player, index) => {
+          if (player.alive) {
+            player.body.velocity.setTo(resumeVelocities[index])
+          }
+        })
+
+        players.state = c.states.walking
+      }, game).autoDestroy = true
+    }
+
+    const openChestOnce = _.once(openChest)
+
+    game.time.events.add(tweenOptions[0] * 0.8, () => {
+      // click to open chest
+      chest.events.onInputDown.addOnce(openChestOnce)
+    })
+
+    centerChestTween.onComplete.add(() => {
+      // auto open the chest after a delay
+      game.time.events.add(c.delays.autoClick, openChestOnce)
+    })
+
+    function wiggle (aProgress, freq1, freq2) {
+      // return Math.sin(aProgress)
+      const current1 = aProgress * Math.PI * 2 * freq1
+      const current2 = aProgress * (Math.PI * 2 * freq2 + Math.PI / 2)
+
+      return Math.sin(current1) * Math.cos(current2)
+    }
+    const frequency = 6.2
+    const shakeXTween = game.add.tween(chest).to({ x: chest.x + 4 }, tweenOptions[0], (k) => wiggle(k, frequency, frequency), true, 0, -1)
+    const shakeYTween = game.add.tween(chest).to({ y: chest.y + 3 }, tweenOptions[0], (k) => wiggle(k, frequency, frequency), true, 0, -1)
+
+    function rewardSprite (index = 0) {
+      const reward = game.add.sprite(0, 0, 'reward_coins')
+      reward.x = getCameraCenterX() + index * (c.sizes.reward.width + 30) - c.sizes.reward.width / 2 - 15
+      reward.y = game.camera.height / 2
+      reward.anchor.setTo(0.5)
+
+      reward.isCoins = true
+      reward.rewardValue = 25 // number of coins
+
+      reward.takeReward = function () {
+        // destroy reward -- if coin reward, add to coin total
+        const rewardClickTweens = []
+        rewardClickTweens.push(game.add.tween(reward.scale).to({
+          x: 0,
+          y: 0
+        }, 500))
+        rewardClickTweens[0].onComplete.add(() => {
+          reward.destroy()
+        })
+
+        if (reward.isCoins) {
+          createCoinsIncrementAnimation(reward, reward.rewardValue)
+        }
+        _.forEach(rewardClickTweens, tween => tween.start())
+      }
+      return reward
+    }
   }
 
   function update () {
@@ -773,6 +942,16 @@ window.onload = () => {
     }
 
     const updateHero = (hero, index) => {
+      if (hero.info.team === c.teams.player) {
+        // this is a player
+        if (hero.placesFromFront === 0) {
+          hero.inputEnabled = false
+          hero.input.useHandCursor = false
+        } else {
+          hero.inputEnabled = true
+          hero.input.useHandCursor = true
+        }
+      }
       if (this.game.time.now >= hero.combat.beginRegenAt) {
         // console.info('regeny', hero.healthRegen)
         healHero(hero, hero.healthRegen)
@@ -802,27 +981,28 @@ window.onload = () => {
     }
 
     if (firstPlayer) {
-      forEachAliveHero(players.sprites, updateHero, true)
+      forEachAliveHero(c.teams.player, updateHero, true)
     } else {
-      players.state = 'dead'
+      players.state = c.states.dead
     }
 
     if (firstEnemy) {
       forEachAliveHero(c.teams.enemy, updateHero, true)
-    } else {
-      enemies.state = 'dead'
+    }
+    if (!firstEnemy) {
+      enemies.state = c.states.dead
     }
 
     if (firstPlayer && !firstEnemy) {
       // no enemies, continue moving through the level
       if (Math.abs(firstPlayer.bottom - this.game.world.height) < 2) {
         // first player is on ground
-        players.state = 'walking'
+        players.state = c.states.walking
       }
     } else if (firstPlayer && firstEnemy) {
       if (distBetweenHeroes(firstPlayer, firstEnemy) <= COMBAT_DISTANCE) {
         // heroes are in combat range
-        players.state = 'fighting'
+        players.state = c.states.fighting
 
         forEachAliveHero(c.teams.player, (hero, index) => {
           if (hero.placesFromFront <= hero.combat.range) {
@@ -833,7 +1013,7 @@ window.onload = () => {
           }
         }, true)
 
-        enemies.state = 'fighting'
+        enemies.state = c.states.fighting
 
         forEachAliveHero(c.teams.enemy, (hero, index) => {
           if (hero.placesFromFront <= hero.combat.range) {
@@ -845,38 +1025,56 @@ window.onload = () => {
           }
         }, true)
       } else {
-        players.state = 'waiting for enemy'
-        enemies.state = 'waiting for enemy'
+        players.state = c.states.waitingOnEnemy
+        enemies.state = c.states.waitingOnEnemy
       }
 
       if (distanceToMiddle(firstPlayer) > COMBAT_DISTANCE / 2) {
-        players.state = 'moving to fight'
-        walkAll(c.teams.player)
+        players.state = c.states.regrouping
       }
       if (distanceToMiddle(firstEnemy) > COMBAT_DISTANCE / 2) {
-        enemies.state = 'moving to fight'
-        walkAll(c.teams.enemy)
+        enemies.state = c.states.regrouping
       }
-    }
-
-    switch (players.state) {
-      case 'walking':
-        walkAll(c.teams.player)
-        // focus camera on front player
-        this.game.camera.focusOnXY(firstPlayer.x + (COMBAT_DISTANCE / 2 + HERO_WIDTH / 2), firstPlayer.y + 0)
-        break
-      case 'dead':
-        gameOverOnce()
-        break
     }
 
     switch (enemies.state) {
-      case 'dead':
+
+      case c.states.regrouping:
+        walkAll(c.teams.enemy)
+        break
+
+      case c.states.dead:
         if (distanceToNextFight === 0) {
           for (let count = 1; (count < zone + 1) && (count <= MAX_ENEMIES_PER_ZONE); count++) {
             spawnEnemy(count - 1, zone)
           }
         }
+        // let the chest trigger
+        const playerChestOverlap = () => {
+          players.state = c.states.openingChest
+          chest.foundChest()
+        }
+        _.forEach(players.sprites, player => {
+          this.game.physics.arcade.collide(players.sprites, chest, playerChestOverlap, null, this)
+        })
+        break
+    }
+
+    switch (players.state) {
+
+      case c.states.walking:
+        walkAll(c.teams.player)
+        // focus camera on front player
+        this.game.camera.focusOnXY(firstPlayer.x + (COMBAT_DISTANCE / 2 + HERO_WIDTH / 2), firstPlayer.y + 0)
+        break
+
+      case c.states.regrouping:
+        walkAll(c.teams.player)
+        break
+
+      case c.states.dead:
+        gameOverOnce()
+        break
     }
 
     // displayGroup.sort('z', Phaser.Group.SORT_DESCENDING)
