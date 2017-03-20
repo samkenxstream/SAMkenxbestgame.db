@@ -81,9 +81,9 @@ window.onload = () => {
 
   const players = {
     sprites: [
-      c.classes.mage.key,
       c.classes.warrior.key,
-      c.classes.archer.key,
+      c.classes.warrior.key,
+      c.classes.warrior.key,
     ],
     frontIndex: 0, // index of the player at the front, ready to attack
     state: 'idle', // 'idle', walking', c.states.fighting, swapping'
@@ -95,7 +95,6 @@ window.onload = () => {
   const enemies = {
     sprites: [
       c.classes.warrior.key,
-      c.classes.priest.key,
     ],
     frontIndex: 0, // index of the player at the front, ready to attack
     state: 'idle', // 'idle', walking', c.states.fighting, swapping'
@@ -169,7 +168,7 @@ window.onload = () => {
     }
     fighter.shiftToFront = () => {
       fighter.placesFromFront = 0
-      fighter.input.useHandCursor = fighter.placesFromFront > 0
+      fighter.input.useHandCursor = false
     }
     fighter.shiftForwards = (places = 1) => {
       fighter.placesFromFront -= places
@@ -193,6 +192,9 @@ window.onload = () => {
       bar = { color: '#48ad05' }
       fighter.inputEnabled = true
       fighter.events.onInputDown.add(() => pushPlayerToFront(fighter.placesFromFront))
+    } else if (team === c.teams.enemy) {
+      fighter.inputEnabled = true
+      fighter.events.onInputDown.add(() => dealDamage(fighter, fighter))
     }
     fighter.healthBar = new HealthBar(game, {x: x - 3, y: y - 15, width: 50, height: 8, bar})
 
@@ -444,12 +446,73 @@ window.onload = () => {
     }, game)
   }
 
+  function updateHealthBar (hero, healthBar) {
+    healthBar.setPercent(hero.health / hero.maxHealth * 100)
+  }
+
+  function dealDamage (attacker, victim) {
+    const damage = attacker.combat.hitDamage()
+    let damageValue = damage.value
+    if (attacker.info.fighterClass === c.classes.archer.key) {
+      // archers deal more damage from further away
+      damageValue = Math.round(damageValue + damageValue * (attacker.placesFromFront * 0.3))
+    }
+    victim.damage(damageValue)
+    // begin health regeneration some time after damage was taken
+    victim.combat.beginRegenAt = game.time.now + (Phaser.Timer.SECOND * c.HEALTH_REGEN_DELAY)
+
+    // render a hit splat
+    const hitSplat = game.add.graphics()
+
+    const splatColors = c.colors.hitSplat.default
+    const fillColor = damage.critical ? splatColors.fill : splatColors.fill
+    const lineColor = damage.critical ? splatColors.strokeCritical : splatColors.stroke
+    hitSplat.beginFill(fillColor, 1)
+    hitSplat.lineStyle(3, lineColor, 1)
+
+    const rect = {
+      x: -20,
+      y: victim.height / 2.5,
+      width: 36,
+      height: 20
+    }
+    hitSplat.drawRect(rect.x, rect.y, rect.width, rect.height)
+
+    const splatTextStyle = {
+      fill: 'white',
+      fontSize: damage.critical ? '24px' : '20px',
+      boundsAlignH: 'center'
+    }
+    const hitText = game.make.text(-10, rect.y - 3, damageValue.toString(), splatTextStyle)
+    hitText.setTextBounds(-30, damage.critical ? 0 : 3, 80, 30)
+
+    hitSplat.addChild(hitText)
+    if (victim.info.team === c.teams.player) {
+      hitSplat.scale.x *= -1
+    }
+    hitSplat.lifespan = Math.max(300, Math.min(1200, (1000 / attacker.combat.attackSpeed) - 300))
+    hitSplat.events.onKilled.add(() => hitSplat.destroy(true))
+    victim.addChild(hitSplat)
+
+    // update healthbar
+    updateHealthBar(victim, victim.healthBar)
+
+    if (victim.info.team === c.teams.enemy) {
+      // drop particles
+      dropCoins(victim, 2, null, false)
+    }
+  }
+
   const getCameraCenterX = () => {
     return game.camera.width / 2 + game.camera.x
   }
 
   /* @PARAM {number} placesFromFront the number of places the unit clicked on is from the front of their team */
   function pushPlayerToFront (placesFromFront) {
+    if (players.state === c.states.swapping) {
+      // already swapping, dont fuck with me
+      return
+    }
     if (players.sprites.length === 1) {
       console.info('one player, no need to swap')
       return
@@ -459,10 +522,6 @@ window.onload = () => {
     }
     const playerToPushIndex = players.sprites.findIndex(player => player.placesFromFront === placesFromFront)
     const playerToPush = players.sprites[playerToPushIndex]
-    if (!playerToPush.alive) {
-      console.error('BIG PROBLEM - pushPlayerToFront')
-      return
-    }
 
     players.state = c.states.swapping
 
@@ -474,23 +533,41 @@ window.onload = () => {
       return playerB.placesFromFront - playerA.placesFromFront
     })
 
+    const tweenOptions = [
+      400, // duration
+      Phaser.Easing.Quadratic.Out, // easing
+      true, // auto start
+    ]
+
     playersToShift.reduce((previousPlayerX, player) => {
       const originalX = player.x
-      player.x = previousPlayerX
-      player.shiftBackwards()
+
+      const tweenPlayer = game.add.tween(player).to({
+        x: previousPlayerX,
+      }, ...tweenOptions)
+      // player.x = previousPlayerX
+      tweenPlayer.onComplete.add(() => player.shiftBackwards())
+
       return originalX
     }, playersToShift[0].x)
 
-    playerToPush.x = playerAtFrontX // move the player to the front
-    playerToPush.combat.attackTimer = playerAtFront.combat.attackTimer
-    playerToPush.shiftToFront() // move the player to the front
+    // playerToPush.x = playerAtFrontX  // move the player to the front
+    const tweenPlayerToFront = game.add.tween(playerToPush).to({
+      x: playerAtFrontX,
+    }, ...tweenOptions)
+
+    tweenPlayerToFront.onComplete.add(() => {
+      players.frontIndex = playerToPushIndex
+      playerToPush.shiftToFront() // move the player to the front
+
+      players.state = ''
+    })
     // the player being pushed to the front needs to wait to attack
     // this prevents a player from spam swapping their heroes to attack with each as often as possible
-
-    players.frontIndex = playerToPushIndex
+    playerToPush.combat.attackTimer = playerAtFront.combat.attackTimer
   }
 
-  function spawnEnemy (placesFromFront = 0, combatLevel = 0, fighterClass) {
+  function spawnEnemy (placesFromFront = 0, combatLevel = 0, fighterClass = c.classes.warrior.key) {
     if (!fighterClass) {
       // pick a random class
       const classes = _.values(c.classes)
@@ -768,61 +845,6 @@ window.onload = () => {
       })
     }
 
-    function dealDamage (attacker, victim) {
-      const damage = attacker.combat.hitDamage()
-      let damageValue = damage.value
-      if (attacker.info.fighterClass === c.classes.archer.key) {
-        // archers deal more damage from further away
-        damageValue = Math.round(damageValue + damageValue * (attacker.placesFromFront * 0.3))
-      }
-      const damageString = damage.critical ? damageValue.toString() + '!' : damageValue.toString()
-      victim.damage(damageValue)
-      // begin health regeneration some time after damage was taken
-      victim.combat.beginRegenAt = game.time.now + (Phaser.Timer.SECOND * c.HEALTH_REGEN_DELAY)
-
-      // render a hit splat
-      const hitSplat = game.add.graphics()
-
-      const splatColors = c.colors.hitSplat[attacker.info.fighterClass]
-      const defaultSplatColors = c.colors.hitSplat.default
-      const fillColor = damage.critical ? defaultSplatColors.fillCritical : splatColors.fill
-      const lineColor = damage.critical ? defaultSplatColors.strokeCritical : splatColors.stroke
-      hitSplat.beginFill(fillColor, 1)
-      hitSplat.lineStyle(3, lineColor, 1)
-
-      const rect = {
-        x: -20,
-        y: victim.height / 2.5,
-        width: 36,
-        height: 20
-      }
-      hitSplat.drawRect(rect.x, rect.y, rect.width, rect.height)
-
-      const splatTextStyle = {
-        fill: 'white',
-        fontSize: damage.critical ? '24px' : '20px',
-        boundsAlignH: 'center'
-      }
-      const hitText = game.make.text(-10, rect.y - 3, damageString, splatTextStyle)
-      hitText.setTextBounds(-30, damage.critical ? 0 : 3, 80, 30)
-
-      hitSplat.addChild(hitText)
-      if (victim.info.team === c.teams.player) {
-        hitSplat.scale.x *= -1
-      }
-      hitSplat.lifespan = Math.max(300, Math.min(1200, (1000 / attacker.combat.attackSpeed) - 300))
-      hitSplat.events.onKilled.add(() => hitSplat.destroy(true))
-      victim.addChild(hitSplat)
-
-      // update healthbar
-      updateHealthBar(victim, victim.healthBar)
-
-      if (victim.info.team === c.teams.enemy) {
-        // drop particles
-        dropCoins(victim, 2, null, false)
-      }
-    }
-
     const attackHero = (attacker, victim) => {
       // perform attack based on class
       switch (attacker.info.fighterClass) {
@@ -891,10 +913,6 @@ window.onload = () => {
           projectile.kill()
         }
       }
-    }
-
-    function updateHealthBar (hero, healthBar) {
-      healthBar.setPercent(hero.health / hero.maxHealth * 100)
     }
 
     function healHero (hero, healValue) {
@@ -1011,40 +1029,43 @@ window.onload = () => {
         players.state = c.states.walking
       }
     } else if (firstPlayer && firstEnemy) {
-      if (distBetweenHeroes(firstPlayer, firstEnemy) <= COMBAT_DISTANCE) {
-        // heroes are in combat range
-        players.state = c.states.fighting
+      // not currently swapping players around
+      if (players.state !== c.states.swapping) {
+        if (distBetweenHeroes(firstPlayer, firstEnemy) <= COMBAT_DISTANCE) {
+          // heroes are in combat range
+          players.state = c.states.fighting
 
-        forEachAliveHero(c.teams.player, (hero, index) => {
-          if (hero.placesFromFront <= hero.combat.range) {
-            // this hero can attack from a distance
-            if (hero.combat.attackTimer <= game.time.now) {
-              attackHero.call(this, hero, firstEnemy)
+          forEachAliveHero(c.teams.player, (hero, index) => {
+            if (hero.placesFromFront <= hero.combat.range) {
+              // this hero can attack from a distance
+              if (hero.combat.attackTimer <= game.time.now) {
+                attackHero.call(this, hero, firstEnemy)
+              }
             }
-          }
-        }, true)
+          }, true)
 
-        enemies.state = c.states.fighting
+          enemies.state = c.states.fighting
 
-        forEachAliveHero(c.teams.enemy, (hero, index) => {
-          if (hero.placesFromFront <= hero.combat.range) {
-            // this hero is in range to attack
-            // console.info('atk del', hero.combat.attackTimer)
-            if (hero.combat.attackTimer <= game.time.now) {
-              attackHero.call(this, hero, firstPlayer)
+          forEachAliveHero(c.teams.enemy, (hero, index) => {
+            if (hero.placesFromFront <= hero.combat.range) {
+              // this hero is in range to attack
+              // console.info('atk del', hero.combat.attackTimer)
+              if (hero.combat.attackTimer <= game.time.now) {
+                attackHero.call(this, hero, firstPlayer)
+              }
             }
-          }
-        }, true)
-      } else {
-        players.state = c.states.waitingOnEnemy
-        enemies.state = c.states.waitingOnEnemy
-      }
+          }, true)
+        } else {
+          players.state = c.states.waitingOnEnemy
+          enemies.state = c.states.waitingOnEnemy
+        }
 
-      if (distanceToMiddle(firstPlayer) > COMBAT_DISTANCE / 2) {
-        players.state = c.states.regrouping
-      }
-      if (distanceToMiddle(firstEnemy) > COMBAT_DISTANCE / 2) {
-        enemies.state = c.states.regrouping
+        if (distanceToMiddle(firstPlayer) > COMBAT_DISTANCE / 2) {
+          players.state = c.states.regrouping
+        }
+        if (distanceToMiddle(firstEnemy) > COMBAT_DISTANCE / 2) {
+          enemies.state = c.states.regrouping
+        }
       }
     }
 
@@ -1102,7 +1123,7 @@ window.onload = () => {
 
   function render () {
     // this.game.debug.geom(lineCameraMiddle, 'grey')
-    // this.game.debug.text(players.state, 5, 20, 'blue')
+    this.game.debug.text(players.state, 5, 20, 'blue')
     // this.game.debug.text(enemies.state, this.game.camera.width - 180, 20, 'orange')
     // this.game.debug.text(this.game.coins.bufferValue, this.game.camera.width / 2 - 50, 20, 'yellow')
   }

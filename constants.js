@@ -1,7 +1,7 @@
 /* eslint-disable */
 // keep this file in json syntax so it is easier later when we need it as a json
 module.exports = () => ({
-  "HEALTH_REGEN_DELAY": 7.5,
+  "HEALTH_REGEN_DELAY": 5.0,
   "teams": {
     "player": "player",
     "enemy": "enemy"
@@ -9,9 +9,9 @@ module.exports = () => ({
   "states": {
     "walking": "walking",
     "fighting": "fighting",
-    "swapping": "swapping - shouldnt stay on this state",
-    "regrouping": "moving to fight",
-    "waitingOnEnemy": "waiting for enemy",
+    "swapping": "--swapping--",
+    "regrouping": "regrouping",
+    "waitingOnEnemy": "waiting on enemy",
     "openingChest": "opening a chest!",
     "dead": "dead"
   },
@@ -63,7 +63,7 @@ module.exports = () => ({
       "gravityModifier": .24,
       "combat": {
         "range": 1,
-        "attackSpeed": (.35 / 1.8),
+        "attackSpeed": (.35 / 1.5),
         "critChance": .1
       }
     },
@@ -117,25 +117,11 @@ module.exports = () => ({
       }
     },
     "hitSplat": {
-      "warrior": {
-        "fill": 0xba0c0c,
-        "stroke": 0x740606
-      },
-      "archer": {
-        "fill": 0x0c0ccb,
-        "stroke": 0x0c0c94
-      },
-      "mage": {
-        "fill": 0xdaba0c,
-        "stroke": 0x747406
-      },
-      "priest": {
-        "fill": 0xba0c0c,
-        "stroke": 0x740606
-      },
       "default": {
-        "fillCritical": 0x111111,
-        "strokeCritical": 0x000000
+        "fill": 0xba0c0c,
+        "stroke": 0x740606,
+        "fillCritical": 0xba0c0c,
+        "strokeCritical": 0xba0c0c
       }
     },
     "green": 0x0cc50c,
