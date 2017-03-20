@@ -5,10 +5,10 @@
   "main": "game.js",
   "scripts": {
     "start": "budo game.js --live --open --port 8000 --watch-glob **/*.{html,js,css}",
-    "copy-files": "rm -rf ./build && mkdir build && cp index.html ./build && cp -r ./plugins ./build && cp -r ./images ./build",
-    "bundle": "browserify --entry game.js --outfile ./build/game.js",
+    "copy-files": "cp index.html ./build && cp -r ./plugins ./build && cp -r ./images ./build",
+    "bundle": "browserify --entry game.js --outfile ./build/game.js -t [ babelify --presets [ es2015 ] ]",
     "build": "npm run copy-files && npm run bundle",
-    "deploy": "npm run build && surge ./build gacha.surge.sh"
+    "deploy": "rm -rf ./build && mkdir build && npm run build && surge ./build gacha.surge.sh"
   },
   "repository": {
     "type": "git",
@@ -21,6 +21,8 @@
   },
   "homepage": "https://github.com/troy-lamerton/gacha4good#readme",
   "devDependencies": {
+    "babel-preset-es2015": "^6.24.0",
+    "babelify": "^7.3.0",
     "browserify": "^14.1.0"
   }
 }
