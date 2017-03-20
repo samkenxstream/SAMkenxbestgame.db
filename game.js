@@ -316,6 +316,82 @@ window.onload = () => {
     this.game.world.bringToTop(coinEmitter)
   }
 
+  function makeEndMenu () {
+    const margin = 15
+    const menuMargin = 11
+
+    // menu bg
+    const menu = game.make.graphics()
+    const menuRect = {
+      x: game.world.centerX,
+      y: 0,
+      width: 185,
+      height: game.camera.height - menuMargin * 2
+    }
+    menuRect.y = menuMargin
+    const fillColor = c.colors.menu.bg.fill
+    const lineColor = c.colors.menu.bg.stroke
+    menu.beginFill(fillColor, 1)
+    menu.lineStyle(3, lineColor, 1)
+    menu.drawRect(menuRect.x - menuRect.width / 2, menuRect.y, menuRect.width, menuRect.height)
+    menu.anchor.y = 0.5
+
+    const coinIconAndTextRect = {
+      width: 50
+    }
+    const coinIcon = game.add.sprite(getCameraCenterX() - coinIconAndTextRect.width / 2, game.world.centerY - menuRect.height / 5.5, 'collectible1')
+    coinIcon.scale.setTo(0.85)
+    coinIcon.anchor.setTo(0.5)
+
+    const coinsTextStyle = {
+      font: '38px Arial',
+      fontStyle: 'bold',
+      fill: '#ffff0b',
+    }
+
+    const playAgainTextStyle = {
+      fill: '#fafafa',
+      font: '20px Arial'
+    }
+    const coinValue = game.coins.value + game.coins.bufferValue
+    const coinText = game.make.text(coinIcon.width + margin / 3, 0, coinValue.toString(), coinsTextStyle)
+
+    coinText.setScaleMinMax(1, 1)
+    coinText.anchor.y = 0.42
+
+    // play again button
+    const playAgainButton = game.make.text(getCameraCenterX(), game.world.centerY + menuRect.height / 4, 'Play Again', _.assign({}, coinsTextStyle, playAgainTextStyle))
+    playAgainButton.align = 'center'
+    playAgainButton.anchor.setTo(0.5)
+
+    coinIcon.addChild(coinText)
+    menu.addChild(coinIcon)
+    menu.addChild(playAgainButton)
+
+    game.input.onDown.add(() => window.location.reload())
+
+    return menu
+  }
+
+  function gameOver () {
+    // game.paused = true
+    console.info('game over')
+    // game.input.onDown.add(() => {game.paused = false})
+    const menu = makeEndMenu()
+    menu.alpha = 0
+    game.add.existing(menu)
+
+    const delay = 600
+    const duration = 1300
+    const menuTween = game.add.tween(menu).to({alpha: 1}, duration, Phaser.Easing.Linear.None, true, delay)
+    // const a = game.add.tween(menuAdded).to( { alpha: 1 }, 2000, "Linear", true)
+    menuTween.onComplete.add(function () {
+      game.paused = true
+    }, game)
+  }
+
+  const gameOverOnce = _.once(gameOver)
+
   function createCoinsIncrementAnimation (coin, coinValue) {
     coin.alive = true
     coin.visible = true
@@ -790,8 +866,7 @@ window.onload = () => {
         this.game.camera.focusOnXY(firstPlayer.x + (COMBAT_DISTANCE / 2 + HERO_WIDTH / 2), firstPlayer.y + 0)
         break
       case 'dead':
-        gameOver()
-        this.game.paused = true
+        gameOverOnce()
         break
     }
 
@@ -814,66 +889,6 @@ window.onload = () => {
       //  Move to the right
       firstPlayer.body.velocity.x = 2 * HERO_MOVEMENT_VELOCITY
     }
-  }
-
-  function renderEndMenu () {
-    const margin = 15
-
-    // menu bg
-    const menu = game.add.graphics()
-    const menuRect = {
-      x: game.world.centerX,
-      y: 0,
-      width: 220,
-      height: game.camera.height
-    }
-    const fillColor = c.colors.menu.bg.fill
-    const lineColor = c.colors.menu.bg.stroke
-    menu.beginFill(fillColor, 1)
-    menu.lineStyle(3, lineColor, 1)
-    menu.drawRect(menuRect.x - menuRect.width / 2, menuRect.y, menuRect.width, menuRect.height)
-
-    const coinIcon = game.add.sprite(game.world.centerX - menuRect.width / 3, game.world.centerY - menuRect.height / 4, 'collectible1')
-    coinIcon.scale.setTo(0.4)
-    coinIcon.anchor.setTo(0.5)
-
-    const coinsTextStyle = {
-      font: '28px Arial',
-      fill: '#ffff0b',
-      stroke: 'yellow',
-      strokeThickness: 1.7
-    }
-
-    const playAgainTextStyle = {
-      font: '22px Arial'
-    }
-    const coinText = game.make.text(coinIcon.width + margin, 0, game.coins.value.toString(), coinsTextStyle)
-    const coinText2 = game.make.text(coinIcon.width + coinText.width + margin * 4, 0, 'collected', _.assign({}, coinsTextStyle, {fill: '#eaeaea', strokeThickness: 0.8}))
-
-    coinText.anchor.y = 0.4
-    coinText2.anchor.y = 0.4
-    coinText.setScaleMinMax(1, 1)
-    coinText2.setScaleMinMax(1, 1)
-
-    coinIcon.addChild(coinText)
-    coinIcon.addChild(coinText2)
-    menu.addChild(coinIcon)
-
-    // play again button
-    const playAgainButton = game.make.text(game.world.centerX, game.world.centerY + menuRect.height / 4, 'Play Again', _.assign({}, coinsTextStyle, playAgainTextStyle))
-    playAgainButton.align = 'center'
-    playAgainButton.anchor.setTo(0.5)
-
-    menu.addChild(playAgainButton)
-
-    game.input.onDown.add(() => window.location.reload())
-  }
-
-  function gameOver () {
-    game.paused = true
-    console.info('game over')
-    // game.input.onDown.add(() => {game.paused = false})
-    renderEndMenu()
   }
 
   function render () {
