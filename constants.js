@@ -1,12 +1,18 @@
-/* eslint-disable */
-// keep this file in json syntax so it is easier later when we need it as a json
-module.exports = () => ({
-  "HEALTH_REGEN_DELAY": 5.0,
-  "teams": {
+/* eslint-disable quotes, comma-dangle */
+
+/*
+ * All constants for the game are stored here
+ *
+ * Time values for delays, cooldowns, etc are in seconds
+ *
+ */
+function Constants (staging = false) {
+  this.teams = {
     "player": "player",
     "enemy": "enemy"
-  },
-  "states": {
+  }
+
+  this.states = {
     "walking": "walking",
     "fighting": "fighting",
     "swapping": "--swapping--",
@@ -14,80 +20,75 @@ module.exports = () => ({
     "waitingOnEnemy": "waiting on enemy",
     "openingChest": "opening a chest!",
     "dead": "dead"
-  },
-  "classes": {
+  }
+
+  this.classes = {
     "default": {
       "maxHealth": 300,
-      "healthRegen": 1,
+      "healthRegen": 0.5,
       "combat": {
         "range": 0,
-        "attackSpeed": .35,
-        "minHitDamage": 30.0,
-        "maxHitDamage": 60.0,
-        "critChance": .12,
+        "attackSpeed": 0.35,
+        "minHitDamage": 40.0,
+        "maxHitDamage": 50.0,
+        "critChance": 0.10,
       },
       "combatPerLevel": {
-        "attackSpeed": .05,
-        "minHitDamage": 5.0,
-        "maxHitDamage": 5.0,
-        "critChance": .01,
+        "attackSpeed": 0.015,
+        "minHitDamage": 4.0,
+        "maxHitDamage": 4.0,
+        "critChance": 0.01,
       },
       "extraPerLevel": {
         "health": 47
       }
-    },
+    }
+  }
+  const def = this.classes.default
+  this.classes = Object.assign({}, this.classes, {
     "warrior": {
       "key": "warrior",
-      "combat": {
-        "range": 0
-      },
       "combatPerLevel": {
-        "minHitDamage": 9.0,
-        "maxHitDamage": 9.0,
-        "critChance": .03
+        "minHitDamage": 7.0,
+        "maxHitDamage": 7.0,
+        "critChance": 0.03
+      }
+    },
+    "mage": {
+      "key": "mage",
+      "maxHealth": def.maxHealth * (2 / 3),
+      "gravityModifier": 0.24,
+      "combat": {
+        "minHitDamage": def.combat.minHitDamage / 2,
+        "maxHitDamage": def.combat.maxHitDamage / 2,
+        "critChance": 0.07
       }
     },
     "archer": {
       "key": "archer",
       "combat": {
-        "range": 2,
-        "attackSpeed": (.35 / 1.3)
+        "attackSpeed": (def.combat.attackSpeed / 1.3)
       },
-      "combatPerLevel": {
-        "attackSpeed": .04
-      }
-    },
-    "mage": {
-      "key": "mage",
-      "maxHealth": 200,
-      "gravityModifier": .24,
-      "combat": {
-        "range": 1,
-        "attackSpeed": (.35 / 1.5),
-        "critChance": .1
-      }
     },
     "priest": {
       "key": "priest",
-      "maxHealth": 180,
-      "gravityModifier": .6,
+      "maxHealth": Math.ceil(def.maxHealth * (18 / 30)),
+      "gravityModifier": 0.6,
       "combat": {
         "range": 0,
-        "attackSpeed": 0.6,
-        "minHitDamage": 30.0,
-        "maxHitDamage": 45.0,
+        "attackSpeed": def.combat.attackSpeed * 1.5,
+        "minHitDamage": def.combat.minHitDamage / 2,
+        "maxHitDamage": def.combat.maxHitDamage / 2,
         "critChance": 0
       },
       "combatPerLevel": {
-        "attackSpeed": .05,
-        "minHitDamage": 2.0,
-        "maxHitDamage": 2.0,
+        "attackSpeed": def.combatPerLevel.attackSpeed * 1.5,
         "critChance": 0
       },
       "abilities": {
         "passive": {
           "name": "heal_team",
-          "value": 40.0,
+          "value": def.maxHealth / 9,
           "cooldown": 6.0,
           "timer": null
         }
@@ -99,8 +100,9 @@ module.exports = () => ({
         }
       }
     }
-  },
-  "projectiles": {
+  })
+
+  this.projectiles = {
     "arrow": {
       "key": "arrow"
     },
@@ -108,8 +110,9 @@ module.exports = () => ({
       "key": "fireball",
       "scale": 0.4
     }
-  },
-  "colors": {
+  }
+
+  this.colors = {
     "menu": {
       "bg": {
         "fill": 0x222222,
@@ -126,13 +129,20 @@ module.exports = () => ({
     },
     "green": 0x0cc50c,
     "darkGreen": 0x0cac0c
-  },
-  "sizes": {
+  }
+
+  this.sizes = {
     "reward": {
       "width": 104
     }
-  },
-  "delays": {
-    "autoClick": 3800
   }
-})
+
+  this.delays = {
+    "AUTO_CLICK": 3.8,
+    "HEALTH_REGEN": 5.5,
+  }
+}
+
+Constants.prototype.constructor = Constants
+
+module.exports = Constants

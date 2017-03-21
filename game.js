@@ -1,8 +1,8 @@
 /* global Phaser, HealthBar, _ */
 /* eslint-disable comma-dangle */
 
-const c = require('./constants.js')()
-
+const Constants = require('./constants.js')
+const c = new Constants()
 window.onload = () => {
   const MIN_TWITCH_WIDTH = 644
   const GAME_WIDTH = MIN_TWITCH_WIDTH
@@ -26,7 +26,6 @@ window.onload = () => {
 
   let projectiles,
     lineCameraMiddle,
-    background,
     coinEmitter,
     displayGroup,
     chest
@@ -70,7 +69,6 @@ window.onload = () => {
       game.world.resize(game.world.width + extraDistanceToNextFight, game.world.height)
       if (isRewardZone(zone)) {
         // spawn a reward chest at the end of the zone
-        console.info('new chest')
         chest = game.add.sprite(getCameraCenterX() + game.camera.width / 2 - 20, game.world.height / 2 - 4, 'chest_closed')
         chest.foundChest = _.once(foundChestSaga)
         chest.scale.setTo(0.9, 0.63)
@@ -81,12 +79,12 @@ window.onload = () => {
 
   const players = {
     sprites: [
-      c.classes.warrior.key,
+      c.classes.mage.key,
       c.classes.warrior.key,
       c.classes.warrior.key,
     ],
     frontIndex: 0, // index of the player at the front, ready to attack
-    state: 'idle', // 'idle', walking', c.states.fighting, swapping'
+    state: 'idle',
     getAllAliveUnits,
     getFirstAliveUnit,
     onHeroKilled: onPlayerKilled
@@ -95,9 +93,10 @@ window.onload = () => {
   const enemies = {
     sprites: [
       c.classes.warrior.key,
+      c.classes.warrior.key,
     ],
     frontIndex: 0, // index of the player at the front, ready to attack
-    state: 'idle', // 'idle', walking', c.states.fighting, swapping'
+    state: 'idle',
     getAllAliveUnits,
     getFirstAliveUnit,
     onHeroKilled: onEnemyKilled
@@ -164,15 +163,16 @@ window.onload = () => {
     fighter.placesFromFront = placesFromFront
     fighter.shiftBackwards = (places = 1) => {
       fighter.placesFromFront += places
-      fighter.input.useHandCursor = fighter.placesFromFront > 0
+      // input enable / disable and hand cursor code is now in update() but should be moved back here
+      // fighter.input.useHandCursor = fighter.placesFromFront > 0
     }
     fighter.shiftToFront = () => {
       fighter.placesFromFront = 0
-      fighter.input.useHandCursor = false
+      // fighter.input.useHandCursor = false
     }
     fighter.shiftForwards = (places = 1) => {
       fighter.placesFromFront -= places
-      fighter.input.useHandCursor = fighter.placesFromFront > 0
+      // fighter.input.useHandCursor = fighter.placesFromFront > 0
     }
 
     // health and healthRegen
@@ -328,8 +328,8 @@ window.onload = () => {
     projectiles.setAll('outOfBoundsKill', true)
 
     coinEmitter = this.game.add.emitter(0, 0, 100) // max 100 coins at once
-    coinEmitter.maxParticleScale = 0.4
-    coinEmitter.minParticleScale = 0.4
+    coinEmitter.maxParticleScale = 0.3
+    coinEmitter.minParticleScale = 0.3
 
     // spriteKey, frame, quantity, collide?, collideWorldBounds?
     // i think that the quantity chosen here restricts the max quantity generated in one call
@@ -402,9 +402,7 @@ window.onload = () => {
   }
 
   function gameOver () {
-    // game.paused = true
     console.info('game over')
-    // game.input.onDown.add(() => {game.paused = false})
     const menu = makeEndMenu()
     menu.alpha = 0
     game.add.existing(menu)
@@ -412,7 +410,6 @@ window.onload = () => {
     const delay = 600
     const duration = 1300
     const menuTween = game.add.tween(menu).to({alpha: 1}, duration, Phaser.Easing.Linear.None, true, delay)
-    // const a = game.add.tween(menuAdded).to( { alpha: 1 }, 2000, "Linear", true)
     menuTween.onComplete.add(function () {
       game.paused = true
     }, game)
@@ -433,7 +430,7 @@ window.onload = () => {
     }, duration, Phaser.Easing.Exponential.In, true)
 
     game.add.tween(coin).to({
-      alpha: 0.3
+      alpha: 0.5
     }, duration * 0.85, Phaser.Easing.Exponential.In, true)
 
     // when animation finishes:
@@ -450,16 +447,16 @@ window.onload = () => {
     healthBar.setPercent(hero.health / hero.maxHealth * 100)
   }
 
-  function dealDamage (attacker, victim) {
-    const damage = attacker.combat.hitDamage()
-    let damageValue = damage.value
-    if (attacker.info.fighterClass === c.classes.archer.key) {
-      // archers deal more damage from further away
-      damageValue = Math.round(damageValue + damageValue * (attacker.placesFromFront * 0.3))
+  function dealDamage (attacker, victim, damageValue = null) {
+    if (!_.get(victim, ['alive'])) {
+      // the victim died as we tried to hit them :(
+      return
     }
-    victim.damage(damageValue)
+    const damage = attacker.combat.hitDamage()
+    let damageDealt = damageValue || damage.value
+    victim.damage(damageDealt)
     // begin health regeneration some time after damage was taken
-    victim.combat.beginRegenAt = game.time.now + (Phaser.Timer.SECOND * c.HEALTH_REGEN_DELAY)
+    victim.combat.beginHealthRegenAt = game.time.now + (Phaser.Timer.SECOND * c.delays.HEALTH_REGEN)
 
     // render a hit splat
     const hitSplat = game.add.graphics()
@@ -483,7 +480,7 @@ window.onload = () => {
       fontSize: damage.critical ? '24px' : '20px',
       boundsAlignH: 'center'
     }
-    const hitText = game.make.text(-10, rect.y - 3, damageValue.toString(), splatTextStyle)
+    const hitText = game.make.text(-10, rect.y - 3, damageDealt.toString(), splatTextStyle)
     hitText.setTextBounds(-30, damage.critical ? 0 : 3, 80, 30)
 
     hitSplat.addChild(hitText)
@@ -524,6 +521,7 @@ window.onload = () => {
     const playerToPush = players.sprites[playerToPushIndex]
 
     players.state = c.states.swapping
+    enemies.state = c.states.waitingOnEnemy
 
     const playerAtFront = players.getFirstAliveUnit()
     const playerAtFrontX = playerAtFront.x
@@ -652,7 +650,7 @@ window.onload = () => {
       chest.loadTexture('chest_open')
       chest.anchor.x = 0.35
       chest.alpha = 0.8
-      chest.useHandCursor = false
+      chest.input.useHandCursor = false
       chest.inputEnabled = false
 
       // spawn rewards
@@ -707,7 +705,7 @@ window.onload = () => {
 
     centerChestTween.onComplete.add(() => {
       // auto open the chest after a delay
-      game.time.events.add(c.delays.autoClick, openChestOnce)
+      game.time.events.add(c.delays.AUTO_CLICK * Phaser.Timer.SECOND, openChestOnce)
     })
 
     function wiggle (aProgress, freq1, freq2) {
@@ -828,6 +826,7 @@ window.onload = () => {
     }
 
     const burnTeam = (attacker, targetTeam) => {
+      const damageValue = attacker.combat.hitDamage().value
       forEachAliveHero(targetTeam, victim => {
         const firePosition = {
           x: 0,
@@ -841,7 +840,7 @@ window.onload = () => {
         fireSprite.animations.play('flicker', 10, true)
         fireSprite.events.onKilled.add(() => fireSprite.destroy())
         victim.addChild(fireSprite)
-        dealDamage(attacker, victim)
+        dealDamage(attacker, victim, damageValue)
       })
     }
 
@@ -851,7 +850,7 @@ window.onload = () => {
         case c.classes.warrior.key:
           // attack animation
           attacker.body.velocity.y = -125
-          dealDamage.call(this, attacker, victim)
+          dealDamage(attacker, victim)
           break
         case c.classes.archer.key:
           attacker.body.velocity.y = -170
@@ -863,7 +862,7 @@ window.onload = () => {
           break
         case c.classes.priest.key:
           attacker.body.velocity.y = -105
-          dealDamage.call(this, attacker, victim)
+          dealDamage(attacker, victim)
           break
       }
 
@@ -934,7 +933,7 @@ window.onload = () => {
 
     function castAbility (caster, ability, abilityPerLevel) {
       switch (ability.name) {
-        case 'heal_team':
+        case c.classes.priest.abilities.passive.name:
           caster.body.velocity.y = -80
           forEachAliveHero(caster.info.team, hero => {
             healHero(hero, ability.value + (abilityPerLevel.value * caster.combat.level))
@@ -974,19 +973,19 @@ window.onload = () => {
       if (hero.info.team === c.teams.player) {
         // this is a player
         if (hero.placesFromFront === 0) {
-          hero.inputEnabled = false
           hero.input.useHandCursor = false
+          hero.inputEnabled = false
         } else {
           hero.inputEnabled = true
           hero.input.useHandCursor = true
         }
       }
-      if (this.game.time.now >= hero.combat.beginRegenAt) {
-        // console.info('regeny', hero.healthRegen)
+
+      if (this.game.time.now >= hero.combat.beginHealthRegenAt) {
         healHero(hero, hero.healthRegen)
         hero.healthBar.setPercent(hero.health / hero.maxHealth * 100)
       }
-      // hero.combat.attackTimer--
+
       if (hero.abilities) {
         hero.abilities = _.mapValues(hero.abilities, ability => {
           ability.timer--
@@ -1011,50 +1010,27 @@ window.onload = () => {
 
     if (firstPlayer) {
       forEachAliveHero(c.teams.player, updateHero, true)
-    } else {
-      players.state = c.states.dead
     }
 
     if (firstEnemy) {
       forEachAliveHero(c.teams.enemy, updateHero, true)
     }
-    if (!firstEnemy) {
-      enemies.state = c.states.dead
-    }
 
-    if (firstPlayer && !firstEnemy) {
-      // no enemies, continue moving through the level
-      if (Math.abs(firstPlayer.bottom - this.game.world.height) < 2) {
-        // first player is on ground
-        players.state = c.states.walking
-      }
-    } else if (firstPlayer && firstEnemy) {
-      // not currently swapping players around
-      if (players.state !== c.states.swapping) {
+    // heroes do not fight or move while players are swapping
+    if (players.state !== c.states.swapping) {
+      // fighting, regrouping or walking
+      if (firstPlayer && !firstEnemy) {
+        // no enemies, continue moving through the level
+        if (Math.abs(firstPlayer.bottom - this.game.world.height) < 2) {
+          // first player is on ground
+          players.state = c.states.walking
+        }
+      } else if (firstPlayer && firstEnemy) {
+        // not currently swapping players around
         if (distBetweenHeroes(firstPlayer, firstEnemy) <= COMBAT_DISTANCE) {
           // heroes are in combat range
           players.state = c.states.fighting
-
-          forEachAliveHero(c.teams.player, (hero, index) => {
-            if (hero.placesFromFront <= hero.combat.range) {
-              // this hero can attack from a distance
-              if (hero.combat.attackTimer <= game.time.now) {
-                attackHero.call(this, hero, firstEnemy)
-              }
-            }
-          }, true)
-
           enemies.state = c.states.fighting
-
-          forEachAliveHero(c.teams.enemy, (hero, index) => {
-            if (hero.placesFromFront <= hero.combat.range) {
-              // this hero is in range to attack
-              // console.info('atk del', hero.combat.attackTimer)
-              if (hero.combat.attackTimer <= game.time.now) {
-                attackHero.call(this, hero, firstPlayer)
-              }
-            }
-          }, true)
         } else {
           players.state = c.states.waitingOnEnemy
           enemies.state = c.states.waitingOnEnemy
@@ -1069,10 +1045,29 @@ window.onload = () => {
       }
     }
 
+    // dead state overwrites all other states
+    if (!firstPlayer) {
+      players.state = c.states.dead
+    }
+    if (!firstEnemy) {
+      enemies.state = c.states.dead
+    }
+
     switch (enemies.state) {
 
       case c.states.regrouping:
         walkAll(c.teams.enemy)
+        break
+
+      case c.states.fighting:
+        forEachAliveHero(c.teams.enemy, (hero, index) => {
+          if (hero.placesFromFront <= hero.combat.range) {
+            // this hero is in range to attack
+            if (hero.combat.attackTimer <= game.time.now) {
+              attackHero.call(this, hero, firstPlayer)
+            }
+          }
+        }, true)
         break
 
       case c.states.dead:
@@ -1104,12 +1099,21 @@ window.onload = () => {
         walkAll(c.teams.player)
         break
 
+      case c.states.fighting:
+        forEachAliveHero(c.teams.player, (hero, index) => {
+          if (hero.placesFromFront <= hero.combat.range) {
+            // this hero can attack from a distance
+            if (hero.combat.attackTimer <= game.time.now) {
+              attackHero.call(this, hero, firstEnemy)
+            }
+          }
+        }, true)
+        break
+
       case c.states.dead:
         gameOverOnce()
         break
     }
-
-    // displayGroup.sort('z', Phaser.Group.SORT_DESCENDING)
 
     // keyboard movement for testing purposes
     if (cursors.left.isDown) {

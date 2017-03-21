@@ -1,3 +1,4 @@
+/* global Phaser */
 /**
  Copyright (c) 2015 Belahcen Marwane (b.marwane@gmail.com)
 
@@ -49,7 +50,7 @@ HealthBar.prototype.mergeWithDefaultConfiguration = function (newConfig) {
     bar: {
       color: '#48ad05'
     },
-    animationDuration: 700,
+    animationDuration: 400,
     flipped: false,
     isFixedToCamera: false
   }
@@ -130,7 +131,7 @@ HealthBar.prototype.setWidth = function (newWidth) {
   if (this.flipped) {
     newWidth = -1 * newWidth
   }
-  this.game.add.tween(this.barSprite).to({ width: newWidth }, this.config.animationDuration, Phaser.Easing.Linear.None, true)
+  this.game.add.tween(this.barSprite).to({ width: newWidth }, this.config.animationDuration, Phaser.Easing.Quadratic.Out, true)
 }
 
 HealthBar.prototype.setFixedToCamera = function (fixedToCamera) {
