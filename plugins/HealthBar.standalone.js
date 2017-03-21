@@ -21,13 +21,14 @@
  SOFTWARE.
 */
 
-const HealthBar = function (game, providedConfig) {
+var HealthBar = function (game, providedConfig) {
   this.game = game
 
   this.setupConfiguration(providedConfig)
   this.setPosition(this.config.x, this.config.y)
   this.drawBackground()
   this.drawHealthBar()
+  this.setPercent(this.config.percent, false)
   this.setFixedToCamera(this.config.isFixedToCamera)
 }
 
@@ -45,14 +46,15 @@ HealthBar.prototype.mergeWithDefaultConfiguration = function (newConfig) {
     x: 0,
     y: 0,
     bg: {
-      color: 'transparent'
+      color: 'red'
     },
     bar: {
       color: '#48ad05'
     },
     animationDuration: 400,
     flipped: false,
-    isFixedToCamera: false
+    isFixedToCamera: false,
+    percent: 100
   }
 
   return mergeObjects(defaultConfig, newConfig)
@@ -70,7 +72,7 @@ function mergeObjects (targetObj, newObj) {
 }
 
 HealthBar.prototype.drawBackground = function () {
-  var bmd = this.game.add.bitmapData(this.config.width, this.config.height)
+  var bmd = this.game.make.bitmapData(this.config.width, this.config.height)
   bmd.ctx.fillStyle = this.config.bg.color
   bmd.ctx.beginPath()
   bmd.ctx.rect(0, 0, this.config.width, this.config.height)
@@ -80,7 +82,7 @@ HealthBar.prototype.drawBackground = function () {
   bmd.ctx.stroke()
 
   this.bgSprite = this.game.add.sprite(this.x, this.y, bmd)
-  this.bgSprite.anchor.set(0.5)
+  this.bgSprite.anchor.x = 0.5
 
   if (this.flipped) {
     this.bgSprite.scale.x = -1
@@ -88,21 +90,17 @@ HealthBar.prototype.drawBackground = function () {
 }
 
 HealthBar.prototype.drawHealthBar = function () {
-  var bmd = this.game.add.bitmapData(this.config.width, this.config.height)
+  var bmd = this.game.make.bitmapData(this.config.width, this.config.height)
   bmd.ctx.fillStyle = this.config.bar.color
   bmd.ctx.beginPath()
   bmd.ctx.rect(0, 0, this.config.width, this.config.height)
   bmd.ctx.fill()
-  bmd.ctx.strokeStyle = '#555'
+  bmd.ctx.strokeStyle = this.config.bar.strokeColor
   bmd.ctx.lineWidth = 3
   bmd.ctx.stroke()
 
-  this.barSprite = this.game.add.sprite(this.x - this.bgSprite.width / 2, this.y, bmd)
-  this.barSprite.anchor.y = 0.5
-
-  if (this.flipped) {
-    this.barSprite.scale.x = -1
-  }
+  this.barSprite = this.game.add.sprite(0, 0, bmd)
+  // this.barSprite.anchor.x = 0.5
 }
 
 HealthBar.prototype.setPosition = function (x, y) {
@@ -113,25 +111,30 @@ HealthBar.prototype.setPosition = function (x, y) {
     this.bgSprite.position.x = x
     this.bgSprite.position.y = y
 
-    this.barSprite.position.x = x - this.config.width / 2
+    this.barSprite.position.x = x - this.config.width / 2 - (this.bgSprite.anchor.x * this.bgSprite.width)
     this.barSprite.position.y = y
   }
 }
 
-HealthBar.prototype.setPercent = function (newValue) {
+HealthBar.prototype.setPercent = function (newValue, tween = true) {
   if (newValue < 0) newValue = 0
   if (newValue > 100) newValue = 100
 
-  var newWidth =  (newValue * this.config.width) / 100
+  var newWidth = (newValue * this.config.width) / 100
 
-  this.setWidth(newWidth)
+  if (tween) {
+    this.tweenWidthTo(newWidth)
+  } else {
+    this.setWidth(newWidth)
+  }
+}
+
+HealthBar.prototype.tweenWidthTo = function (newWidth) {
+  this.game.add.tween(this.barSprite).to({ width: newWidth }, this.config.animationDuration, Phaser.Easing.Quadratic.Out, true)
 }
 
 HealthBar.prototype.setWidth = function (newWidth) {
-  if (this.flipped) {
-    newWidth = -1 * newWidth
-  }
-  this.game.add.tween(this.barSprite).to({ width: newWidth }, this.config.animationDuration, Phaser.Easing.Quadratic.Out, true)
+  this.barSprite.width = newWidth
 }
 
 HealthBar.prototype.setFixedToCamera = function (fixedToCamera) {
@@ -142,4 +145,11 @@ HealthBar.prototype.setFixedToCamera = function (fixedToCamera) {
 HealthBar.prototype.kill = function () {
   this.bgSprite.kill()
   this.barSprite.kill()
+}
+
+HealthBar.prototype.getBarSprite = function () {
+  // position the bar showing current hp at the same left as the background sprite
+  this.barSprite.position.x = ((this.config.flipped) ? +1 : -1) * (this.bgSprite.x - this.bgSprite.left)
+  this.bgSprite.addChild(this.barSprite)
+  return this.bgSprite
 }

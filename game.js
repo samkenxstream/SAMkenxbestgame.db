@@ -9,13 +9,13 @@ window.onload = () => {
   const GAME_HEIGHT = 125
 
   const HERO_MOVEMENT_VELOCITY = 80
-  const HERO_WIDTH = 60
+  const HERO_WIDTH = 55 // was 60 in version <= 0.1.5
   const HERO_HEIGHT = 60
 
   const DISTANCE_BETWEEN_HEROES = HERO_WIDTH + 12
   const COMBAT_DISTANCE = 28
   const ENEMY_BASE_X = GAME_WIDTH / 2 + (HERO_WIDTH / 2 + COMBAT_DISTANCE / 2)
-  const MAX_ENEMIES_PER_ZONE = 3
+  const MAX_ENEMIES_PER_ZONE = 5
 
   const game = new Phaser.Game(GAME_WIDTH, GAME_HEIGHT, Phaser.AUTO, '', {
     preload,
@@ -92,7 +92,7 @@ window.onload = () => {
 
   const enemies = {
     sprites: [
-      c.classes.warrior.key,
+      // c.classes.warrior.key,
       c.classes.warrior.key,
     ],
     frontIndex: 0, // index of the player at the front, ready to attack
@@ -107,10 +107,10 @@ window.onload = () => {
     this.game.load.image('background_1', 'images/backgrounds/grass.gif')
 
     // CHARACTERS
-    this.game.load.image(c.classes.warrior.key, 'images/characters/warrior_kappa_60x.png')
-    this.game.load.image(c.classes.archer.key, 'images/characters/archer_emote_60x80.png')
-    this.game.load.image(c.classes.mage.key, 'images/characters/Trihard.png')
-    this.game.load.image(c.classes.priest.key, 'images/characters/priest_feelsgood_60x75.png')
+    this.game.load.image(c.classes.warrior.key, 'images/characters/warrior.png')
+    this.game.load.image(c.classes.mage.key, 'images/characters/mage.png')
+    // this.game.load.image(c.classes.archer.key, 'images/characters/archer_emote_60x80.png')
+    // this.game.load.image(c.classes.priest.key, 'images/characters/priest_feelsgood_60x75.png')
 
     // PARTICLES
     this.game.load.image('arrow', 'images/particles/arrow.png')
@@ -183,20 +183,53 @@ window.onload = () => {
     fighter.maxHealth = Math.round(baseMaxHealth + (extraHealthPerLevel * combatLevel))
     fighter.health = fighter.maxHealth
     fighter.healthRegen = baseHealthRegen + (extraHealthRegenPerLevel * combatLevel)
+
     console.log(`new ${fighter.info.team} ${fighter.info.fighterClass}, ${fighter.health} hp`)
 
-    let bar = { color: '#e2b100' }
     if (team === c.teams.player) {
       fighter.inputEnabled = true
       fighter.input.useHandCursor = placesFromFront > 0
-      bar = { color: '#48ad05' }
       fighter.inputEnabled = true
       fighter.events.onInputDown.add(() => pushPlayerToFront(fighter.placesFromFront))
     } else if (team === c.teams.enemy) {
       fighter.inputEnabled = true
-      fighter.events.onInputDown.add(() => dealDamage(fighter, fighter))
+      fighter.events.onInputDown.add(() => dealDamage(fighter, fighter, 8))
     }
-    fighter.healthBar = new HealthBar(game, {x: x - 3, y: y - 15, width: 50, height: 8, bar})
+
+    const hpStyle = {
+      bar: c.colors.healthBars[team].bar,
+      bg: c.colors.healthBars[team].bg
+    }
+
+    const resourceBarStyle = {
+      bar: c.colors.resourceBar.bar,
+      bg: c.colors.resourceBar.bg
+    }
+
+    fighter.healthBar = new HealthBar(game, {y: -20,
+      x: 0, width: 50,
+      height: 8,
+      bar: hpStyle.bar,
+      bg: hpStyle.bg,
+      flipped: (team === c.teams.player)
+    })
+    fighter.addChild(fighter.healthBar.getBarSprite())
+
+    fighter.energy = 0
+    fighter.maxEnergy = 100 // value when ability is cast
+
+    fighter.energyBar = new HealthBar(game, {
+      y: -30,
+      x: 0,
+      width: 50,
+      height: 8,
+      bar: resourceBarStyle.bar,
+      bg: resourceBarStyle.bg,
+      flipped: (team === c.teams.player),
+      startEmpty: true
+    })
+    fighter.addChild(fighter.energyBar.getBarSprite())
+
 
     // combat values and hit damage
     function hitDamage () {
@@ -460,6 +493,7 @@ window.onload = () => {
 
     // render a hit splat
     const hitSplat = game.add.graphics()
+    hitSplat.boundsPadding = 0
 
     const splatColors = c.colors.hitSplat.default
     const fillColor = damage.critical ? splatColors.fill : splatColors.fill
@@ -496,7 +530,7 @@ window.onload = () => {
 
     if (victim.info.team === c.teams.enemy) {
       // drop particles
-      dropCoins(victim, 2, null, false)
+      // dropCoins(victim, 2, null, false)
     }
   }
 
@@ -872,6 +906,7 @@ window.onload = () => {
     const renderHitSplat = (hero, text, style, lifespan) => {
       // render a hit splat
       const hitSplat = this.game.add.graphics()
+      hitSplat.boundsPadding = 0
 
       const fillColor = style.fill
       const lineColor = style.stroke
@@ -924,7 +959,8 @@ window.onload = () => {
       if (hero.health > hero.maxHealth) {
         hero.health = hero.maxHealth
       }
-      renderHitSplat(hero, '+' + roundedHealValue, {
+      if (roundedHealValue <= 3)
+      renderHitSplat(hero, '+', {
         fill: c.colors.green,
         stroke: c.colors.darkGreen
       }, 850)
@@ -994,7 +1030,7 @@ window.onload = () => {
       }
 
       hero.body.velocity.x = 0
-      hero.healthBar.setPosition(hero.x, hero.y - 14)
+      // hero.healthBar.setPosition(hero.x, hero.y - 14)
       hero.placesFromFront = index
 
       const passiveAbility = _.get(hero, ['abilities', 'passive'])
@@ -1072,7 +1108,7 @@ window.onload = () => {
 
       case c.states.dead:
         if (distanceToNextFight === 0) {
-          for (let count = 1; (count < zone + 1) && (count <= MAX_ENEMIES_PER_ZONE); count++) {
+          for (let count = 1; (count <= zone + 1) && (count <= MAX_ENEMIES_PER_ZONE); count++) {
             spawnEnemy(count - 1, zone)
           }
         }

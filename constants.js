@@ -35,8 +35,8 @@ function Constants (staging = false) {
       },
       "combatPerLevel": {
         "attackSpeed": 0.015,
-        "minHitDamage": 4.0,
-        "maxHitDamage": 4.0,
+        "minHitDamage": 3.0,
+        "maxHitDamage": 3.0,
         "critChance": 0.01,
       },
       "extraPerLevel": {
@@ -49,15 +49,15 @@ function Constants (staging = false) {
     "warrior": {
       "key": "warrior",
       "combatPerLevel": {
-        "minHitDamage": 7.0,
-        "maxHitDamage": 7.0,
+        "minHitDamage": def.combatPerLevel.minHitDamage * 1.7,
+        "maxHitDamage": def.combatPerLevel.maxHitDamage * 1.7,
         "critChance": 0.03
       }
     },
     "mage": {
       "key": "mage",
       "maxHealth": def.maxHealth * (2 / 3),
-      "gravityModifier": 0.24,
+      "gravityModifier": 0.4,
       "combat": {
         "minHitDamage": def.combat.minHitDamage / 2,
         "maxHitDamage": def.combat.maxHitDamage / 2,
@@ -113,10 +113,32 @@ function Constants (staging = false) {
   }
 
   this.colors = {
-    "menu": {
-      "bg": {
-        "fill": 0x222222,
-        "stroke": 0xbbbbbb
+    healthBars: {
+      player: {
+        bg: {
+          color: 'transparent'
+        },
+        bar: {
+          color: '#48ad05'
+        }
+      },
+      enemy: {
+        bg: {
+          color: 'transparent'
+        },
+        bar: {
+          color: '#48ad05'
+          // color: '#e2b100'
+        }
+      }
+    },
+    resourceBar: {
+      bg: {
+        color: 'black'
+      },
+      bar: {
+        color: 'red',
+        strokeColor: 'black'
       }
     },
     "hitSplat": {
@@ -125,6 +147,12 @@ function Constants (staging = false) {
         "stroke": 0x740606,
         "fillCritical": 0xba0c0c,
         "strokeCritical": 0xba0c0c
+      }
+    },
+    "menu": {
+      "bg": {
+        "fill": 0x222222,
+        "stroke": 0xbbbbbb
       }
     },
     "green": 0x0cc50c,
