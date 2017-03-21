@@ -25,13 +25,16 @@ function Constants (staging = false) {
   this.classes = {
     "default": {
       "maxHealth": 300,
+      // "maxHealth": 3000,
       "healthRegen": 0.5,
       "combat": {
         "range": 0,
-        "attackSpeed": 0.35,
+        // "attackSpeed": 0.45,
+        "attackSpeed": 1.7,
         "minHitDamage": 40.0,
         "maxHitDamage": 50.0,
         "critChance": 0.10,
+        attackTimer: null
       },
       "combatPerLevel": {
         "attackSpeed": 0.015,
@@ -52,15 +55,22 @@ function Constants (staging = false) {
         "minHitDamage": def.combatPerLevel.minHitDamage * 1.7,
         "maxHitDamage": def.combatPerLevel.maxHitDamage * 1.7,
         "critChance": 0.03
-      }
+      },
+      abilities: {
+        passive: {
+          name: 'beserk',
+          duration: 3.0,
+          active: false
+        }
+      },
     },
     "mage": {
       "key": "mage",
       "maxHealth": def.maxHealth * (2 / 3),
       "gravityModifier": 0.4,
       "combat": {
-        "minHitDamage": def.combat.minHitDamage / 2,
-        "maxHitDamage": def.combat.maxHitDamage / 2,
+        "minHitDamage": def.combat.minHitDamage * (2 / 3),
+        "maxHitDamage": def.combat.maxHitDamage * (2 / 3),
         "critChance": 0.07
       }
     },
@@ -85,16 +95,16 @@ function Constants (staging = false) {
         "attackSpeed": def.combatPerLevel.attackSpeed * 1.5,
         "critChance": 0
       },
-      "abilities": {
-        "passive": {
+      abilities: {
+        passive: {
           "name": "heal_team",
           "value": def.maxHealth / 9,
           "cooldown": 6.0,
           "timer": null
         }
       },
-      "abilitiesPerLevel": {
-        "passive": {
+      abilitiesPerLevel: {
+        passive: {
           "value": 12.0,
           "cooldownMultiplier": 0.9
         }
@@ -134,11 +144,12 @@ function Constants (staging = false) {
     },
     resourceBar: {
       bg: {
-        color: 'black'
+        color: 'transparent',
+        strokeColor: 'red'
       },
       bar: {
         color: 'red',
-        strokeColor: 'black'
+        strokeColor: 'red'
       }
     },
     "hitSplat": {

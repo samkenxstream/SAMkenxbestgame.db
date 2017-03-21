@@ -46,10 +46,12 @@ HealthBar.prototype.mergeWithDefaultConfiguration = function (newConfig) {
     x: 0,
     y: 0,
     bg: {
-      color: 'red'
+      color: 'red',
+      strokeColor: '#555'
     },
     bar: {
-      color: '#48ad05'
+      color: '#48ad05',
+      strokeColor: '#555'
     },
     animationDuration: 400,
     flipped: false,
@@ -77,7 +79,7 @@ HealthBar.prototype.drawBackground = function () {
   bmd.ctx.beginPath()
   bmd.ctx.rect(0, 0, this.config.width, this.config.height)
   bmd.ctx.fill()
-  bmd.ctx.strokeStyle = '#555'
+  bmd.ctx.strokeStyle = this.config.bar.strokeColor
   bmd.ctx.lineWidth = 3
   bmd.ctx.stroke()
 
