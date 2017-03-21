@@ -28,21 +28,10 @@ window.onload = () => {
   let projectiles,
     lineCameraMiddle,
     coinEmitter,
-    displayGroup,
     chest
   let zone = 0
 
   // this = players OR enemies
-  const getFirstAliveUnit = function () {
-    let mostFrontSprite = this.sprites.getFirstAlive()
-    this.sprites.forEachAlive((sprite) => {
-      if (sprite.placesFromFront < mostFrontSprite.placesFromFront) {
-        mostFrontSprite = sprite
-      }
-    })
-    return mostFrontSprite
-  }
-
   const onPlayerKilled = function () {
     if (this.sprites.countLiving() === 0) {
       // all players dead, game over
@@ -61,15 +50,23 @@ window.onload = () => {
       const extraDistanceToNextFight = (5 / 7) * GAME_WIDTH // on top walking to the edge of the current zone
       game.world.resize(game.world.width + extraDistanceToNextFight, game.world.height)
 
-      // reward at zone 3, 6, 9, ... (every 3 zones)
+      // rewards at zone 3, 6, 9, ... (every 3 zones)
       // reward appears at the end of the current zone
 
-      if ((zone) => (zone > 0) && (zone % 3 === 0)) {
+      if (true || (zone > 0) && (zone % 3 === 0)) {
         // spawn a reward chest at the end of the zone
+        if (chest && chest.destroy) chest.destroy()
         chest = game.add.sprite(getCameraCenterX() + game.camera.width / 2 - 20, game.world.height / 2 - 4, 'chest_closed')
         chest.foundChest = _.once(foundChestSaga)
         chest.scale.setTo(0.9, 0.63)
         game.physics.arcade.enable(chest)
+        // let the chest trigger
+        const playerChestOverlap = () => {
+          console.info('playerChestOverlap')
+          players.state = c.states.openingChest
+          chest.foundChest()
+        }
+        game.physics.arcade.overlap(players.sprites.getFirstAlive(), chest, playerChestOverlap)
       }
     }
   }
@@ -82,7 +79,6 @@ window.onload = () => {
     ],
     frontIndex: 0, // index of the player at the front, ready to attack
     state: 'idle',
-    getFirstAliveUnit,
     onHeroKilled: onPlayerKilled
   }
 
@@ -95,7 +91,6 @@ window.onload = () => {
     ],
     frontIndex: 0, // index of the player at the front, ready to attack
     state: 'idle',
-    getFirstAliveUnit,
     onHeroKilled: onEnemyKilled
   }
 
@@ -122,7 +117,6 @@ window.onload = () => {
   }
 
   function createFighter (teamObject, {team, fighterClass, x, y, combatLevel = 0, maxHealth, placesFromFront, onHeroKilled}) {
-    console.log(`start create ${team} ${fighterClass}`)
     const baseClass = c.classes[fighterClass]
     const baseDefault = c.classes.default
     // numFromFront is the number
@@ -161,16 +155,25 @@ window.onload = () => {
     fighter.placesFromFront = placesFromFront
     fighter.shiftBackwards = (numPlaces = 1) => {
       fighter.placesFromFront += numPlaces
-      // input enable / disable and hand cursor code is now in update() but should be moved back here
-      // fighter.input.useHandCursor = fighter.placesFromFront > 0
+      fighter.updateInputEnabled(fighter.placesFromFront)
     }
     fighter.shiftToFront = () => {
       fighter.placesFromFront = 0
+      console.info(fighter.info.fighterClass, fighter.placesFromFront, fighter.z)
+      teamObject.sprites.bringToTop(fighter)
+      console.info(fighter.info.fighterClass, fighter.placesFromFront, fighter.z)
       // fighter.input.useHandCursor = false
+      fighter.updateInputEnabled(fighter.placesFromFront)
     }
     fighter.shiftForwards = (numPlaces = 1) => {
       fighter.placesFromFront -= numPlaces
-      // fighter.input.useHandCursor = fighter.placesFromFront > 0
+      fighter.updateInputEnabled(fighter.placesFromFront)
+    }
+    fighter.updateInputEnabled = (placesFromFront) => {
+      const canClickToSwap = placesFromFront > 0
+
+      fighter.input.useHandCursor = canClickToSwap
+      fighter.inputEnabled = canClickToSwap
     }
 
     // health and healthRegen
@@ -184,13 +187,15 @@ window.onload = () => {
 
     console.log(`new ${fighter.info.team} ${fighter.info.fighterClass}, ${fighter.health} hp`)
 
+    fighter.inputEnabled = true
+
     if (team === c.teams.player) {
-      fighter.inputEnabled = true
-      fighter.input.useHandCursor = placesFromFront > 0
-      fighter.inputEnabled = true
+      const canClickToSwap = placesFromFront > 0
+
+      fighter.input.useHandCursor = canClickToSwap
+      fighter.inputEnabled = canClickToSwap
       fighter.events.onInputDown.add(() => { pushPlayerToFront(fighter) }, game)
     } else if (team === c.teams.enemy) {
-      fighter.inputEnabled = true
       fighter.events.onInputDown.add(() => dealDamage(fighter, fighter, 8))
     }
 
@@ -255,7 +260,7 @@ window.onload = () => {
     // fighter.events.onKilled.add(() => { fighter.healthBar.kill() })
     fighter.events.onKilled.add(onHeroKilled.bind(teamObject, fighter))
 
-    teamObject.sprites.add(fighter)
+    teamObject.sprites.addAt(fighter, placesFromFront)
     return fighter
   }
 
@@ -318,22 +323,7 @@ window.onload = () => {
     lineCameraMiddle = new Phaser.Line(0, 0, 0, GAME_HEIGHT)
     // END OF TESTING CODE
 
-    displayGroup = this.game.add.group()
-
     const playerBaseX = this.game.world.centerX - (HERO_WIDTH / 2 + COMBAT_DISTANCE / 2)
-
-    players.sprites = this.game.add.group()
-    _.forEach(players.initialHeroes, (fighterClass, index) => {
-      createFighter(players, {
-        team: c.teams.player,
-        fighterClass,
-        x: playerBaseX - DISTANCE_BETWEEN_HEROES * index,
-        y: this.game.world.height - HERO_HEIGHT,
-        placesFromFront: index,
-        onHeroKilled: players.onHeroKilled,
-        combatLevel: 2
-      })
-    })
 
     enemies.sprites = this.game.add.group()
     _.forEach(enemies.initialHeroes, (fighterClass, index) => {
@@ -346,7 +336,19 @@ window.onload = () => {
         onHeroKilled: enemies.onHeroKilled
       })
     })
-    displayGroup.add(enemies.sprites, true, displayGroup.length) // put enemies below coins
+
+    players.sprites = this.game.add.group()
+    _.forEach(players.initialHeroes, (fighterClass, index) => {
+      createFighter(players, {
+        team: c.teams.player,
+        fighterClass,
+        x: playerBaseX - DISTANCE_BETWEEN_HEROES * index,
+        y: this.game.world.height - HERO_HEIGHT,
+        placesFromFront: index,
+        onHeroKilled: players.onHeroKilled,
+        combatLevel: 10
+      })
+    })
 
     projectiles = this.game.add.group()
     projectiles.enableBody = true
@@ -547,6 +549,8 @@ window.onload = () => {
       // already swapping, dont fuck with me
       return
     }
+    players.state = c.states.swapping
+    // enemies.state = c.states.waitingOnEnemy
 
     console.info(`push ${playerToPush.info.fighterClass} from ${playerToPush.placesFromFront}`)
     const placesFromFront = playerToPush.placesFromFront
@@ -560,10 +564,7 @@ window.onload = () => {
     }
     const playerToPushIndex = players.sprites.filter(player => player.placesFromFront === placesFromFront)[0]
 
-    players.state = c.states.swapping
-    enemies.state = c.states.waitingOnEnemy
-
-    const playerAtFront = players.getFirstAliveUnit()
+    const playerAtFront = players.sprites.getFirstAlive()
     const playerAtFrontX = playerAtFront.x
 
     let playersToShift = []
@@ -632,7 +633,6 @@ window.onload = () => {
       placesFromFront,
       onHeroKilled: enemies.onHeroKilled
     })
-    displayGroup.add(enemy)
     return enemy
   }
   window.spawn = function () {
@@ -810,8 +810,9 @@ window.onload = () => {
     const cursors = this.game.input.keyboard.createCursorKeys()
 
     const distanceToNextFight = this.game.world.width - (this.game.camera.x + this.game.camera.width)
-    const firstPlayer = players.getFirstAliveUnit()
-    const firstEnemy = enemies.getFirstAliveUnit()
+
+    const firstPlayer = players.sprites.getFirstAlive()
+    const firstEnemy = enemies.sprites.getFirstAlive()
 
     this.game.physics.arcade.overlap(enemies.sprites, projectiles, projectileHitsHero, null, this)
     this.game.physics.arcade.overlap(players.sprites, projectiles, projectileHitsHero, null, this)
@@ -1035,17 +1036,6 @@ window.onload = () => {
     }
 
     const updateHero = (hero, index) => {
-      if (hero.info.team === c.teams.player) {
-        // this is a player
-        if (hero.placesFromFront === 0) {
-          hero.input.useHandCursor = false
-          hero.inputEnabled = false
-        } else {
-          hero.inputEnabled = true
-          hero.input.useHandCursor = true
-        }
-      }
-
       if (this.game.time.now >= hero.combat.beginHealthRegenAt) {
         healHero(hero, hero.healthRegen)
         hero.healthBar.setPercent(hero.health / hero.maxHealth * 100)
@@ -1112,10 +1102,10 @@ window.onload = () => {
     }
 
     // dead state overwrites all other states
-    if (!firstPlayer) {
+    if (!_.get(firstPlayer, ['alive'])) {
       players.state = c.states.dead
     }
-    if (!firstEnemy) {
+    if (!_.get(firstEnemy, ['alive'])) {
       enemies.state = c.states.dead
     }
 
@@ -1141,16 +1131,7 @@ window.onload = () => {
           for (let count = 1; (count <= zone + 1) && (count <= MAX_ENEMIES_PER_ZONE); count++) {
             spawnEnemy(count - 1, zone)
           }
-          enemies.state = c.states.regrouping
         }
-        // let the chest trigger
-        const playerChestOverlap = () => {
-          players.state = c.states.openingChest
-          chest.foundChest()
-        }
-        _.forEach(players.sprites, player => {
-          this.game.physics.arcade.collide(players.sprites, chest, playerChestOverlap, null, this)
-        })
         break
     }
 
@@ -1171,7 +1152,6 @@ window.onload = () => {
           if (hero.placesFromFront <= hero.combat.range) {
             // this hero can attack from a distance
             if (hero.combat.attackTimer <= game.time.now) {
-
               attackHero.call(this, hero, firstEnemy)
 
               if (!_.get(hero, ['abilities', 'passive', 'active'])) {
@@ -1181,7 +1161,6 @@ window.onload = () => {
                 }
                 hero.energyBar.setPercent(hero.energy / hero.maxEnergy * 100)
               }
-
             }
           }
         }, true)
@@ -1210,4 +1189,3 @@ window.onload = () => {
     // this.game.debug.text(this.game.coins.bufferValue, this.game.camera.width / 2 - 50, 20, 'yellow')
   }
 }
-
