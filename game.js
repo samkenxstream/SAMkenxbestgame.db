@@ -25,8 +25,7 @@ window.onload = () => {
     render
   })
 
-  let projectiles,
-    lineCameraMiddle,
+  let lineCameraMiddle,
     coinEmitter,
     chest
   let zone = 0
@@ -77,7 +76,6 @@ window.onload = () => {
       c.classes.warrior.key,
       c.classes.mage.key,
     ],
-    frontIndex: 0, // index of the player at the front, ready to attack
     state: 'idle',
     onHeroKilled: onPlayerKilled
   }
@@ -89,7 +87,6 @@ window.onload = () => {
       c.classes.mage.key,
       c.classes.warrior.key,
     ],
-    frontIndex: 0, // index of the player at the front, ready to attack
     state: 'idle',
     onHeroKilled: onEnemyKilled
   }
@@ -105,7 +102,7 @@ window.onload = () => {
     this.game.load.image(c.classes.priest.key, 'images/characters/mage.png')
 
     // PARTICLES
-    this.game.load.image('arrow', 'images/particles/arrow.png')
+    // this.game.load.image('arrow', 'images/particles/arrow.png')
     this.game.load.spritesheet('flames', 'images/particles/animated/flames.png', 32, 40)
 
     this.game.load.image('collectible1', 'images/particles/gold_coin_v3.gif')
@@ -116,11 +113,21 @@ window.onload = () => {
     this.game.stage.disableVisibilityChange = true
   }
 
-  function createFighter (teamObject, {team, fighterClass, x, y, combatLevel = 0, maxHealth, placesFromFront, onHeroKilled}) {
+  function Fighter (...args) {
+
+      var x = game.rnd.between(100, 770);
+      var y = game.rnd.between(0, 570);
+
+
+      game.physics.arcade.enable(this);
+  }
+  Fighter.prototype = Object.create(Phaser.Sprite.prototype);
+  Fighter.prototype.constructor = Fighter;
+  function Fighter (teamObject, {team, fighterClass, x, y, combatLevel = 0, maxHealth, onHeroKilled}) {
     const baseClass = c.classes[fighterClass]
     const baseDefault = c.classes.default
     // numFromFront is the number
-    let fighter
+    const fighter = this
     let xDirection
     let flipHorizontally = false
 
@@ -131,7 +138,8 @@ window.onload = () => {
       xDirection = -1
     }
 
-    fighter = game.make.sprite(x, y, c.classes[fighterClass].key)
+    Phaser.Sprite.call(this, game, x, y, c.classes[fighterClass].key);
+    // fighter = game.make.sprite(x, y, c.classes[fighterClass].key)
 
     fighter.anchor.setTo(0.5, 0)
     if (flipHorizontally) {
@@ -152,25 +160,18 @@ window.onload = () => {
     fighter.body.collideWorldBounds = true
     fighter.body.gravity.y = baseClass.gravityModifier ? baseClass.gravityModifier * 700 : 700
 
-    fighter.placesFromFront = placesFromFront
-    fighter.shiftBackwards = (numPlaces = 1) => {
-      fighter.placesFromFront += numPlaces
-      fighter.updateInputEnabled(fighter.placesFromFront)
-    }
-    fighter.shiftToFront = () => {
-      fighter.placesFromFront = 0
-      console.info(fighter.info.fighterClass, fighter.placesFromFront, fighter.z)
+    fighter.shiftToBack = (numPlaces = 1) => {
       teamObject.sprites.bringToTop(fighter)
-      console.info(fighter.info.fighterClass, fighter.placesFromFront, fighter.z)
-      // fighter.input.useHandCursor = false
-      fighter.updateInputEnabled(fighter.placesFromFront)
+      fighter.updateInputEnabled(fighter.z)
     }
-    fighter.shiftForwards = (numPlaces = 1) => {
-      fighter.placesFromFront -= numPlaces
-      fighter.updateInputEnabled(fighter.placesFromFront)
+
+    fighter.shiftToFront = () => {
+      teamObject.sprites.sendToBack(fighter)
+      fighter.updateInputEnabled(fighter.z)
     }
-    fighter.updateInputEnabled = (placesFromFront) => {
-      const canClickToSwap = placesFromFront > 0
+
+    fighter.updateInputEnabled = (z) => {
+      const canClickToSwap = z > 0
 
       fighter.input.useHandCursor = canClickToSwap
       fighter.inputEnabled = canClickToSwap
@@ -190,11 +191,11 @@ window.onload = () => {
     fighter.inputEnabled = true
 
     if (team === c.teams.player) {
-      const canClickToSwap = placesFromFront > 0
+      const canClickToSwap = true
 
       fighter.input.useHandCursor = canClickToSwap
       fighter.inputEnabled = canClickToSwap
-      fighter.events.onInputDown.add(() => { pushPlayerToFront(fighter) }, game)
+      fighter.events.onInputDown.add(() => { swapPlayerToFront(fighter) }, game)
     } else if (team === c.teams.enemy) {
       fighter.events.onInputDown.add(() => dealDamage(fighter, fighter, 8))
     }
@@ -259,9 +260,6 @@ window.onload = () => {
     fighter.combat = newCombatStats
     // fighter.events.onKilled.add(() => { fighter.healthBar.kill() })
     fighter.events.onKilled.add(onHeroKilled.bind(teamObject, fighter))
-
-    teamObject.sprites.addAt(fighter, placesFromFront)
-    return fighter
   }
 
   function create () {
@@ -327,7 +325,7 @@ window.onload = () => {
 
     enemies.sprites = this.game.add.group()
     _.forEach(enemies.initialHeroes, (fighterClass, index) => {
-      createFighter(enemies, {
+      const hero = new Fighter(enemies, {
         team: c.teams.enemy,
         fighterClass,
         x: ENEMY_BASE_X + DISTANCE_BETWEEN_HEROES * index,
@@ -335,11 +333,12 @@ window.onload = () => {
         placesFromFront: index,
         onHeroKilled: enemies.onHeroKilled
       })
+      enemies.sprites.add(hero)
     })
 
     players.sprites = this.game.add.group()
     _.forEach(players.initialHeroes, (fighterClass, index) => {
-      createFighter(players, {
+      const hero = new Fighter(players, {
         team: c.teams.player,
         fighterClass,
         x: playerBaseX - DISTANCE_BETWEEN_HEROES * index,
@@ -348,21 +347,8 @@ window.onload = () => {
         onHeroKilled: players.onHeroKilled,
         combatLevel: 10
       })
+      players.sprites.add(hero)
     })
-
-    projectiles = this.game.add.group()
-    projectiles.enableBody = true
-    projectiles.physicsBodyType = Phaser.Physics.ARCADE
-
-    projectiles.createMultiple(50, 'arrow')
-    projectiles.setAll('checkWorldBounds', true)
-    projectiles.setAll('scale.x', 0.5)
-    projectiles.setAll('scale.y', 0.5)
-    projectiles.setAll('scale.y', 0.5)
-    projectiles.setAll('angle', -44)
-    projectiles.setAll('anchor.x', 1)
-    projectiles.setAll('anchor.y', 1)
-    projectiles.setAll('outOfBoundsKill', true)
 
     coinEmitter = this.game.add.emitter(0, 0, 100) // max 100 coins at once
     coinEmitter.maxParticleScale = 0.3
@@ -540,11 +526,10 @@ window.onload = () => {
   }
 
   const getCameraCenterX = () => {
-    return game.camera.width / 2 + game.camera.x
+    return game.camera.view.centerX
   }
 
-  /* @PARAM {number} placesFromFront the number of places the unit clicked on is from the front of their team */
-  function pushPlayerToFront (playerToPush) {
+  function swapPlayerToFront (playerToPush) {
     if (players.state === c.states.swapping) {
       // already swapping, dont fuck with me
       return
@@ -552,59 +537,38 @@ window.onload = () => {
     players.state = c.states.swapping
     // enemies.state = c.states.waitingOnEnemy
 
-    console.info(`push ${playerToPush.info.fighterClass} from ${playerToPush.placesFromFront}`)
-    const placesFromFront = playerToPush.placesFromFront
 
     if (players.sprites.countLiving() === 1) {
       console.info('only 1 living player, no need to swap')
       return
-    } else if (placesFromFront === 0) {
+    } else if (playerToPush.z === 0) {
       console.info('already at front, no need to swap')
       return
     }
-    const playerToPushIndex = players.sprites.filter(player => player.placesFromFront === placesFromFront)[0]
+    console.info(`push ${playerToPush.info.fighterClass} from ${playerToPush.z}`)
 
     const playerAtFront = players.sprites.getFirstAlive()
     const playerAtFrontX = playerAtFront.x
 
-    let playersToShift = []
-    players.sprites.forEachAlive((player) => {
-      if (player.placesFromFront <= placesFromFront) {
-        playersToShift.push(player)
-      }
-    })
-
-    playersToShift.sort((playerA, playerB) => {
-      return playerB.placesFromFront - playerA.placesFromFront
-    })
-
     const tweenOptions = [
-      400, // duration
+      500, // duration
       Phaser.Easing.Quadratic.Out, // easing
       true, // auto start
     ]
 
-    playersToShift.reduce((previousPlayerX, player) => {
-      const originalX = player.x
+    playerToPush.shiftToFront() // move the player to the front
+    playerAtFront.shiftToBack()
 
-      const tweenPlayer = game.add.tween(player).to({
-        x: previousPlayerX,
-      }, ...tweenOptions)
-      // player.x = previousPlayerX
-      tweenPlayer.onComplete.add(() => player.shiftBackwards())
+    const tweenFrontPlayerBackwards = game.add.tween(playerAtFront).to({
+      x: playerToPush.x,
+    }, ...tweenOptions)
 
-      return originalX
-    }, playersToShift[0].x)
-
-    // playerToPush.x = playerAtFrontX  // move the player to the front
     const tweenPlayerToFront = game.add.tween(playerToPush).to({
       x: playerAtFrontX,
     }, ...tweenOptions)
 
-    tweenPlayerToFront.onComplete.add(() => {
-      players.frontIndex = playerToPushIndex
-      playerToPush.shiftToFront() // move the player to the front
 
+    tweenPlayerToFront.onComplete.add(() => {
       players.state = ''
     })
     // the player being pushed to the front needs to wait to attack
@@ -624,16 +588,15 @@ window.onload = () => {
       }
     }
     const x = getCameraCenterX() + (HERO_WIDTH / 2) + (COMBAT_DISTANCE / 2) + 1
-    const enemy = createFighter(enemies, {
+    const newEnemy = new Fighter(enemies, {
       team: c.teams.enemy,
       combatLevel,
       fighterClass,
       x: x + DISTANCE_BETWEEN_HEROES * placesFromFront,
       y: game.world.height - HERO_HEIGHT,
-      placesFromFront,
       onHeroKilled: enemies.onHeroKilled
     })
-    return enemy
+    enemies.sprites.add(newEnemy)
   }
   window.spawn = function () {
     spawnEnemy.apply(game, arguments)
@@ -814,9 +777,6 @@ window.onload = () => {
     const firstPlayer = players.sprites.getFirstAlive()
     const firstEnemy = enemies.sprites.getFirstAlive()
 
-    this.game.physics.arcade.overlap(enemies.sprites, projectiles, projectileHitsHero, null, this)
-    this.game.physics.arcade.overlap(players.sprites, projectiles, projectileHitsHero, null, this)
-
     const forEachAliveHero = (heroTeam, execute, frontToBack = false) => {
       let heroes
       if (heroTeam instanceof Array) {
@@ -827,47 +787,10 @@ window.onload = () => {
         heroes = enemies.sprites
       }
 
-      const aliveHeroesArray = []
-      heroes.forEachAlive((hero) => aliveHeroesArray.push(hero))
-
-      aliveHeroesArray.sort((playerA, playerB) => {
-        return playerB.placesFromFront - playerA.placesFromFront
-      })
-
-      if (frontToBack) {
-        aliveHeroesArray.reverse()
-      }
-      aliveHeroesArray.forEach((hero, index) => {
+      heroes.forEachAlive((hero) => {
+        const index = heroes.getIndex(hero)
         execute(hero, index)
       })
-    }
-
-    function distBetweenHeroes (hero1, hero2) {
-      return Phaser.Math.difference(hero1.body.x, hero2.body.x) - HERO_WIDTH
-    }
-
-    function shoot (shooter, xDirection, projectileType = c.projectiles.arrow.key) {
-      const projectile = projectiles.getFirstDead()
-      let projectileX = shooter.x + 18 * xDirection
-      projectile.angle += 180
-      if (xDirection < 0) {
-        projectile.angle -= 180
-        projectileX -= projectile.width
-      }
-      projectile.reset(projectileX, shooter.y + 22)
-      projectile.body.velocity.x = 700 * xDirection
-      projectile.body.gravity.y = 230
-      projectile.body.acceleration.x = -340 * xDirection
-      projectile.shooter = shooter
-      projectile.info = {
-        team: shooter.info.team,
-        projectileType: projectileType
-      }
-      projectile.loadTexture(projectileType)
-      if (projectileType !== c.projectiles.arrow.key) {
-        console.info(shooter.info.fighterClass, projectileType)
-        projectile.scale.setTo(0.4)
-      }
     }
 
     const burnTeam = (attacker, targetTeam) => {
@@ -890,16 +813,13 @@ window.onload = () => {
     }
 
     const attackHero = (attacker, victim) => {
+      if (!_.get(victim, ['alive'])) return
       // perform attack based on class
       switch (attacker.info.fighterClass) {
         case c.classes.warrior.key:
           // attack animation
           attacker.body.velocity.y = -125
           dealDamage(attacker, victim)
-          break
-        case c.classes.archer.key:
-          attacker.body.velocity.y = -170
-          shoot(attacker, attacker.info.xDirection)
           break
         case c.classes.mage.key:
           attacker.body.velocity.y = -85
@@ -947,17 +867,6 @@ window.onload = () => {
       hitSplat.lifespan = lifespan
       hitSplat.events.onKilled.add(() => hitSplat.destroy(true))
       hero.addChild(hitSplat)
-    }
-
-    function projectileHitsHero (victim, projectile) {
-      if (projectile.info.team !== victim.info.team) {
-        // projectile hit a hero and it is not friendly fire
-        // if (vic)
-        if (Math.abs(projectile.body.overlapX) > 30) {
-          dealDamage(projectile.shooter, victim)
-          projectile.kill()
-        }
-      }
     }
 
     function healHero (hero, healValue) {
@@ -1029,13 +938,14 @@ window.onload = () => {
     }
 
     const distanceToMiddle = (sprite) => {
-      return Math.min(
-        Math.abs(sprite.left - getCameraCenterX()),
-        Math.abs(sprite.right - getCameraCenterX())
-      )
+      const d1 = Math.abs(sprite.left - getCameraCenterX())
+      const d2 = Math.abs(sprite.right - getCameraCenterX())
+      // console.info('dist middle', d1, d2)
+      return Math.min(d1,d2)
     }
 
-    const updateHero = (hero, index) => {
+    const updateHero = (hero) => {
+      const index = hero.z
       if (this.game.time.now >= hero.combat.beginHealthRegenAt) {
         healHero(hero, hero.healthRegen)
         hero.healthBar.setPercent(hero.health / hero.maxHealth * 100)
@@ -1048,8 +958,7 @@ window.onload = () => {
       }
 
       hero.body.velocity.x = 0
-      // hero.healthBar.setPosition(hero.x, hero.y - 14)
-      hero.placesFromFront = index
+      // hero.placesFromFront = index
 
       const passiveAbility = _.get(hero, ['abilities', 'passive'])
       if (passiveAbility) {
@@ -1065,48 +974,54 @@ window.onload = () => {
     }
 
     if (firstPlayer) {
-      forEachAliveHero(c.teams.player, updateHero, true)
+      players.sprites.forEachAlive(updateHero)
     }
 
     if (firstEnemy) {
-      forEachAliveHero(c.teams.enemy, updateHero, true)
+      enemies.sprites.forEachAlive(updateHero)
     }
 
+    const playersPreviousState = players.state
     // heroes do not fight or move while players are swapping
-    if (players.state !== c.states.swapping) {
+    // if (players.state !== c.states.swapping) {
       // fighting, regrouping or walking
-      if (firstPlayer && !firstEnemy) {
-        // no enemies, continue moving through the level
-        if (Math.abs(firstPlayer.bottom - this.game.world.height) < 2) {
-          // first player is on ground
-          players.state = c.states.walking
-        }
-      } else if (firstPlayer && firstEnemy) {
-        // not currently swapping players around
-        if (distBetweenHeroes(firstPlayer, firstEnemy) <= COMBAT_DISTANCE) {
-          // heroes are in combat range
-          players.state = c.states.fighting
-          enemies.state = c.states.fighting
-        } else {
-          players.state = c.states.waitingOnEnemy
-          enemies.state = c.states.waitingOnEnemy
-        }
-
-        if (distanceToMiddle(firstPlayer) > COMBAT_DISTANCE / 2) {
-          players.state = c.states.regrouping
-        }
-        if (distanceToMiddle(firstEnemy) > COMBAT_DISTANCE / 2) {
-          enemies.state = c.states.regrouping
-        }
+    if (firstPlayer && !firstEnemy) {
+      // no enemies, continue moving through the level
+      if (Math.abs(firstPlayer.bottom - this.game.world.height) < 2) {
+        // first player is on ground
+        players.state = c.states.walking
       }
+    } else if (firstPlayer && firstEnemy.alive) {
+
+      const playerInCombatRange = distanceToMiddle(firstPlayer) <= COMBAT_DISTANCE / 2
+      const enemyInCombatRange = distanceToMiddle(firstEnemy) <= COMBAT_DISTANCE / 2
+
+      if (playerInCombatRange && enemyInCombatRange) {
+        players.state = c.states.fighting
+        enemies.state = c.states.fighting
+      } else if (!playerInCombatRange) {
+        players.state = c.states.regrouping
+      } else if (!enemyInCombatRange) {
+        enemies.state = c.states.regrouping
+      } else {
+        enemies.state = c.states.waitingOnEnemy
+        players.state = c.states.waitingOnEnemy
+      }
+    }
+    if (playersPreviousState === c.states.swapping) {
+      players.state = playersPreviousState
+      enemies.state = c.states.waitingOnEnemy
     }
 
     // dead state overwrites all other states
-    if (!_.get(firstPlayer, ['alive'])) {
+    if (!firstPlayer) {
       players.state = c.states.dead
     }
-    if (!_.get(firstEnemy, ['alive'])) {
+    if (!firstEnemy) {
       enemies.state = c.states.dead
+      if (players.state === c.states.fighting) {
+        console.warn('players fight while enmy dead!')
+      }
     }
 
     switch (enemies.state) {
@@ -1116,14 +1031,10 @@ window.onload = () => {
         break
 
       case c.states.fighting:
-        forEachAliveHero(c.teams.enemy, (hero, index) => {
-          if (hero.placesFromFront <= hero.combat.range) {
-            // this hero is in range to attack
-            if (hero.combat.attackTimer <= game.time.now) {
-              attackHero.call(this, hero, firstPlayer)
-            }
-          }
-        }, true)
+        const hero = firstEnemy
+        if (hero.combat.attackTimer <= game.time.now) {
+          attackHero.call(this, hero, firstPlayer)
+        }
         break
 
       case c.states.dead:
@@ -1148,22 +1059,19 @@ window.onload = () => {
         break
 
       case c.states.fighting:
-        forEachAliveHero(c.teams.player, (hero, index) => {
-          if (hero.placesFromFront <= hero.combat.range) {
-            // this hero can attack from a distance
-            if (hero.combat.attackTimer <= game.time.now) {
-              attackHero.call(this, hero, firstEnemy)
+        const hero = firstPlayer
+        if (hero.combat.attackTimer <= game.time.now) {
+          attackHero.call(this, hero, firstEnemy)
 
-              if (!_.get(hero, ['abilities', 'passive', 'active'])) {
-                hero.energy += (hero.maxEnergy / 5)
-                if (hero.energy > hero.maxEnergy) {
-                  hero.energy = hero.maxEnergy
-                }
-                hero.energyBar.setPercent(hero.energy / hero.maxEnergy * 100)
-              }
+          // gain energy every time hero attacks
+          if (!_.get(hero, ['abilities', 'passive', 'active'])) {
+            hero.energy += (hero.maxEnergy / 5)
+            if (hero.energy > hero.maxEnergy) {
+              hero.energy = hero.maxEnergy
             }
+            hero.energyBar.setPercent(hero.energy / hero.maxEnergy * 100)
           }
-        }, true)
+        }
         break
 
       case c.states.dead:
@@ -1182,10 +1090,9 @@ window.onload = () => {
   }
 
   function render () {
-    // this.game.debug.geom(lineCameraMiddle, 'grey')
-    // this.game.debug.geom(players.sprites.getBounds(), 'grey')
+    this.game.debug.geom(lineCameraMiddle, 'grey')
     this.game.debug.text(players.state, 5, 20, 'blue')
-    // this.game.debug.text(enemies.state, this.game.camera.width - 180, 20, 'orange')
-    // this.game.debug.text(this.game.coins.bufferValue, this.game.camera.width / 2 - 50, 20, 'yellow')
+    this.game.debug.text(enemies.state, this.game.camera.width - 180, 20, 'orange')
+    this.game.debug.spriteInputInfo(players.sprites.getFurthestFrom({x: game.camera.view.centerX, y: 0}), this.game.camera.width / 2 - 50, 20, 'yellow')
   }
 }
