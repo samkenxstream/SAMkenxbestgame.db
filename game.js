@@ -1,8 +1,11 @@
 /* global Phaser, HealthBar, _ */
 /* eslint-disable comma-dangle */
 
-const Constants = require('./constants.js')
+const Constants = require('./constants')
 const c = new Constants()
+
+const VanishingText = require('./components/Text/VanishingText')
+const StyledText = require('./components/Text/StyledText')
 
 window.onload = () => {
   const MIN_TWITCH_WIDTH = 644
@@ -93,10 +96,16 @@ window.onload = () => {
     this.game.load.image('background_1', 'images/backgrounds/grass.gif')
 
     // CHARACTERS
-    this.game.load.image(c.classes.warrior.key, 'images/characters/warrior.png')
-    this.game.load.image(`${c.classes.warrior.key}_active`, 'images/characters/warrior_active.png')
-    this.game.load.image(`${c.classes.warrior.key}_hurt`, 'images/characters/warrior_hurt.png')
-    this.game.load.image(c.classes.mage.key, 'images/characters/mage.png')
+    
+    this.game.load.image('player_warrior', `images/characters/${c.teams.player}_${c.classes.warrior.key}.png`)
+    this.game.load.image('enemy_warrior', `images/characters/${c.teams.enemy}_${c.classes.warrior.key}.png`)
+    this.game.load.image('player_warrior_active', `images/characters/${c.teams.player}_${c.classes.warrior.key}_active.png`)
+    this.game.load.image('enemy_warrior_active', `images/characters/${c.teams.enemy}_${c.classes.warrior.key}_active.png`)
+    // this.game.load.image('player_warrior_hurt', `images/characters/${c.teams.player}_${c.classes.warrior.key}_hurt.png`)
+    // this.game.load.image('enemy_warrior_hurt', `images/characters/${c.teams.enemy}_${c.classes.warrior.key}_hurt.png`)
+
+    this.game.load.image('player_mage', `images/characters/${c.teams.player}_${c.classes.mage.key}.png`)
+    this.game.load.image('enemy_mage', `images/characters/${c.teams.enemy}_${c.classes.mage.key}.png`)
     // this.game.load.image(c.classes.archer.key, 'images/characters/archer_emote_60x80.png')
     // this.game.load.image(c.classes.priest.key, 'images/characters/mage.png')
 
@@ -109,17 +118,29 @@ window.onload = () => {
     this.game.load.image('chest_closed', 'images/chest_closed.png')
     this.game.load.image('chest_open', 'images/chest_open.png')
     this.game.load.image('reward_coins', 'images/rewards/coins_25.png')
+
     // this.game.stage.disableVisibilityChange = true
   }
 
 
   function Fighter (teamObject, {team, fighterClass, x, y, combatLevel = 0, maxHealth, onHeroKilled}) {
 
+    Phaser.Sprite.call(this, game, x, y, `${team}_${c.classes[fighterClass].key}`);
+
     this.updateInputEnabled = (z) => {
       const canClickToSwap = true ||z > 0
 
       this.input.useHandCursor = canClickToSwap
       this.inputEnabled = canClickToSwap
+    }
+
+    const hitDamage = () => {
+      if (Math.random() < this.combat.critChance) {
+        // we got a critical hit!
+        return { value: Math.ceil(this.combat.maxHitDamage * 1.5), critical: true }
+      }
+      const randomDamage = Math.ceil(this.combat.minHitDamage + (this.combat.maxHitDamage - this.combat.minHitDamage) * Math.random())
+      return { value: randomDamage, critical: false }
     }
 
     const baseClass = c.classes[fighterClass]
@@ -134,9 +155,6 @@ window.onload = () => {
     } else if (team === c.teams.enemy) {
       xDirection = -1
     }
-
-    Phaser.Sprite.call(this, game, x, y, c.classes[fighterClass].key);
-    // fighter = game.make.sprite(x, y, c.classes[fighterClass].key)
 
     this.anchor.setTo(0.5, 0)
     if (flipHorizontally) {
@@ -185,9 +203,17 @@ window.onload = () => {
       bg: c.colors.resourceBar.bg
     }
 
-    this.healthBar = new HealthBar(game, {y: -20,
-      x: 0, width: 50,
-      height: 8,
+    const barOptions = {
+      x: 0,
+      y: -20,
+      width: 50,
+      height: 10
+    }
+    this.healthBar = new HealthBar(game, {
+      x: barOptions.x,
+      y: barOptions.y,
+      width: barOptions.width,
+      height: barOptions.height,
       bar: hpStyle.bar,
       bg: hpStyle.bg,
     })
@@ -198,10 +224,10 @@ window.onload = () => {
       this.maxEnergy = 100 // value when ability is cast
 
       this.energyBar = new HealthBar(game, {
-        y: -30,
-        x: 0,
-        width: 50,
-        height: 8,
+        x: barOptions.x,
+        y: barOptions.y - 15,
+        width: barOptions.width,
+        height: barOptions.height,
         bar: resourceBarStyle.bar,
         bg: resourceBarStyle.bg,
         percent: this.energy
@@ -210,19 +236,10 @@ window.onload = () => {
     }
 
     // combat values and hit damage
-    function hitDamage () {
-      if (Math.random() < newCombatStats.critChance) {
-        // we got a critical hit!
-        return { value: Math.ceil(newCombatStats.maxHitDamage * 1.5), critical: true }
-      }
-      const randomDamage = Math.ceil(newCombatStats.minHitDamage + (newCombatStats.maxHitDamage - newCombatStats.minHitDamage) * Math.random())
-      return { value: randomDamage, critical: false }
-    }
 
     const baseCombatStats = _.assign({}, baseDefault.combat, baseClass.combat, {
       attackTimer: 0,
-      level: combatLevel,
-      hitDamage
+      level: combatLevel
     })
 
     const defaultExtraPerLevel = c.classes.default.combatPerLevel
@@ -233,7 +250,7 @@ window.onload = () => {
 
     const newCombatStats = _.assign({}, baseCombatStats, increasedCombatStats)
     this.combat = newCombatStats
-    // this.events.onKilled.add(() => { this.healthBar.kill() })
+    this.combat.hitDamage = hitDamage
     this.events.onKilled.add(onHeroKilled.bind(teamObject, this))
   }
 
@@ -278,7 +295,7 @@ window.onload = () => {
       }
     }
 
-    this.game.stage.backgroundColor = '#dddddd'
+    this.game.stage.backgroundColor = 'rgb(238, 238, 238)'
 
     // display order -- background first, foreground last
     enemies.sprites = this.game.add.group()
@@ -333,7 +350,10 @@ window.onload = () => {
           // this fixes a long standing bug
           // the first click on the game (clicking anywhere) will trigger this onInputUp event
           // so everytime we must ensure that the mouse is over the player  
-          swapPlayerToFront(player)
+          if (players.state !== c.states.swapping) {
+            // not already swapping, we can initiate a swap
+            swapPlayerToFront(player)
+          }
         }
       })
       hero.updateInputEnabled(hero.z)
@@ -460,6 +480,22 @@ window.onload = () => {
     healthBar.setPercent(hero.health / hero.maxHealth * 100)
   }
 
+  function renderHitNumberText (xPosition, numberValue, rgb = {r: 255, g: 255, b: 10}, gradient = true) {
+    const textSplat = new VanishingText(game, numberValue.toString(), rgb, gradient)
+    textSplat.x = xPosition
+    textSplat.y -= 12
+
+    const riseDistance = Math.min(63, (textSplat.top - game.camera.view.top))
+
+    game.add.tween(textSplat).to({
+      y: textSplat.y - riseDistance
+    }, 900, Phaser.Easing.Quadratic.Out, true)
+
+    textSplat.alphaTween.start()
+
+    foreground.add(textSplat)
+  }
+
   function dealDamage (attacker, victim, damageValue = null) {
     if (!_.get(victim, ['alive'])) {
       // the victim died as we tried to hit them :(
@@ -468,55 +504,10 @@ window.onload = () => {
     const damage = attacker.combat.hitDamage()
     let damageDealt = damageValue || damage.value
     victim.damage(damageDealt)
-    // begin health regeneration some time after damage was taken
     victim.combat.beginHealthRegenAt = game.time.now + (Phaser.Timer.SECOND * c.delays.HEALTH_REGEN)
 
-    // render a hit splat
-    const hitSplat = game.add.graphics()
-    foreground.add(hitSplat)
-    hitSplat.boundsPadding = 0
+    renderHitNumberText(victim.x, damageDealt)
 
-    const splatColors = c.colors.hitSplat.default
-    const fillColor = damage.critical ? splatColors.fill : splatColors.fill
-    const lineColor = damage.critical ? splatColors.strokeCritical : splatColors.stroke
-    hitSplat.beginFill(fillColor, 1)
-    hitSplat.lineStyle(3, lineColor, 1)
-
-    const rect = {
-      x: -20,
-      y: victim.height / 2.5,
-      width: 36,
-      height: 20
-    }
-    hitSplat.drawRect(rect.x, rect.y, rect.width, rect.height)
-
-    const splatTextStyle = {
-      fill: 'white',
-      fontSize: damage.critical ? '24px' : '20px',
-      boundsAlignH: 'center'
-    }
-
-    const hitText = game.make.text(-10, rect.y - 3, damageDealt.toString(), splatTextStyle)
-    hitText.setTextBounds(-30, damage.critical ? 0 : 3, 80, 30)
-
-    hitSplat.addChild(hitText)
-    hitSplat.lifespan = Math.max(300, Math.min(1200, (1000 / attacker.combat.attackSpeed) - 300))
-    hitSplat.events.onKilled.add(() => hitSplat.destroy(true))
-
-    // remove other hitsplats before adding this new one
-    hitSplat.isHitSplat = true
-    _.forEach(victim.children, child => {
-      if (child) {
-        // if hitSplat, remove it
-        if (child.isHitSplat) {
-          victim.removeChild(child)
-          child.destroy()
-        }
-      }
-    })
-    victim.addChild(hitSplat)
-
-    // update healthbar
     updateHealthBar(victim, victim.healthBar)
 
     if (victim.info.team === c.teams.enemy) {
@@ -530,15 +521,8 @@ window.onload = () => {
   }
 
   function swapPlayerToFront (playerToPush) {
-    if (players.state === c.states.swapping) {
-      // already swapping, dont fuck with me
-      return
-    }
-    // enemies.state = c.states.waitingOnEnemy
-
-
     if (players.sprites.countLiving() === 1) {
-      console.info('only 1 living player, no need to swap')
+      console.info('only 1 living, nothing to swap')
       return
     } else if (playerToPush.z === 0) {
       console.info('already at front, no need to swap')
@@ -548,7 +532,6 @@ window.onload = () => {
     players.state = c.states.swapping
 
     const playerAtFront = players.sprites.getFirstAlive()
-    // console.info(`swap ${playerToPush.info.fighterClass} \nfrom ${playerToPush.z}\n  to ${playerAtFront.z}`)
 
     const playerAtFrontX = playerAtFront.x
 
@@ -558,11 +541,10 @@ window.onload = () => {
       true, // auto start
     ]
 
-    playerToPush.updateInputEnabled(playerToPush.z)
-    // playerToPush.fixedToCamera = true
-    playerAtFront.updateInputEnabled(playerAtFront.z)
-    // playerToPush.fixedToCamera = false
     players.sprites.swap(playerToPush, playerAtFront)
+
+    playerToPush.updateInputEnabled(playerToPush.z)
+    playerAtFront.updateInputEnabled(playerAtFront.z)
 
     const tweenFrontPlayerBackwards = game.add.tween(playerAtFront).to({
       x: playerToPush.x,
@@ -602,9 +584,6 @@ window.onload = () => {
       onHeroKilled: enemies.onHeroKilled
     })
     enemies.sprites.add(newEnemy)
-  }
-  window.spawn = function () {
-    spawnEnemy.apply(game, arguments)
   }
 
   function dropCoins (pointer, count = 3, lifespan = 750, explode = true) {
@@ -769,7 +748,7 @@ window.onload = () => {
       } else {
         this.game.coins.value += 1
       }
-      this.game.coins.label.text = this.game.coins.value.toString()
+      this.game.coins.label.setText(this.game.coins.value.toString())
       this.game.coins.bufferValue--
     }
 
@@ -814,14 +793,14 @@ window.onload = () => {
       flames.scale.setTo(0.8, 1.5)
       flames.anchor.x = 0.5
       flames.anchor.y = 1
-      flames.lifespan = Math.min((Phaser.Timer.SECOND / attacker.combat.attackSpeed) * 1.1, Phaser.Timer.SECOND * 1.0)
 
       // aesthetics
       flames.animations.add('flames')
       flames.animations.play('flames', 45, true)
+      flames.alpha = 0.63
+
+      flames.lifespan = Math.min((Phaser.Timer.SECOND / attacker.combat.attackSpeed) * 1.1, Phaser.Timer.SECOND * 1.0)
       flames.events.onKilled.add(() => flames.destroy())
-      // TEMP uncomment this
-      // flames.alpha = 0.63
 
       this.game.add.existing(flames)
 
@@ -869,40 +848,6 @@ window.onload = () => {
       attacker.combat.attackTimer = game.time.now + (1 / attacker.combat.attackSpeed) * 1000
     }
 
-    const renderHitSplat = (hero, text, style, lifespan) => {
-      // render a hit splat
-      const hitSplat = this.game.add.graphics()
-      hitSplat.boundsPadding = 0
-      foreground.add(hitSplat)
-
-      const fillColor = style.fill
-      const lineColor = style.stroke
-      hitSplat.beginFill(fillColor, 1)
-      hitSplat.lineStyle(3, lineColor, 1)
-
-      const rect = {
-        x: -20,
-        y: 20,
-        width: 36,
-        height: 20
-      }
-      hitSplat.drawRect(rect.x, rect.y, rect.width, rect.height)
-
-      const splatTextStyle = {
-        fill: 'white',
-        fontSize: '20px',
-        boundsAlignH: 'center'
-      }
-      const hitText = this.game.make.text(-10, rect.y - 3, text.toString(), splatTextStyle)
-      hitText.setTextBounds(-30, 3, 80, 30)
-
-      hitSplat.addChild(hitText)
-
-      hitSplat.lifespan = lifespan
-      hitSplat.events.onKilled.add(() => hitSplat.destroy(true))
-      hero.addChild(hitSplat)
-    }
-
     function healHero (hero, healValue) {
       if (hero.health === hero.maxHealth) {
         // already max health
@@ -917,10 +862,8 @@ window.onload = () => {
       if (roundedHealValue > 3) {
         healSplatText += roundedHealValue
       }
-      renderHitSplat(hero, healSplatText, {
-        fill: c.colors.green,
-        stroke: c.colors.darkGreen
-      }, 850)
+
+      // TEMP need to render heal vanishing text
       updateHealthBar(hero, hero.healthBar)
 
       if (hero.health > hero.maxHealth) {
@@ -939,16 +882,18 @@ window.onload = () => {
           const targetTeam = (hero.info.team === c.teams.player) ? c.teams.enemies : c.teams.player
           const tickDamageValue = ((hero.minHitDamage + hero.maxHitDamage) / 2) / ability.repeatCount
 
-          const burnTimer = game.time.create(true)
           function burnTick () {
             burnTeamAbilityTick(hero, targetTeam, tickDamageValue, ability)
+            // update energy bar (to zero) after the first damage is applied
+            hero.energyBar.setPercent(hero.energy)
           }
+
           const endTime = Phaser.Timer.SECOND * ability.duration * ability.repeatCount
+          const burnTimer = game.time.create(true)
+
           burnTimer.repeat(Phaser.Timer.SECOND * ability.duration, ability.repeatCount, burnTick, hero)
           burnTimer.add(endTime, () => {
-            console.info('burning complete')
             hero.abilities.passive.active = false
-            hero.energyBar.setPercent(0)
             hero.combat = _.assign({}, hero.combat, originalCombatStats)
           })
           burnTimer.start()
@@ -959,21 +904,20 @@ window.onload = () => {
           hero.body.velocity.y = 1000
           // go beserk
           hero.abilities.passive.active = true
-          hero.loadTexture(`${hero.info.fighterClass}_active`)
+          hero.loadTexture(`${hero.info.team}_${hero.info.fighterClass}_active`)
           hero.combat.attackTimer = game.time.now // start attacking immediately
           hero.combat.attackSpeed = 1.7
           hero.combat.maxHitDamage *= 1.2
           hero.combat.critChance = 1
-            hero.energy = 0
+
           function stopBeserking () {
-            hero.energyBar.setPercent(0)
+            hero.energyBar.setPercent(hero.energy)
             const warrior = this
-            console.info('stop berserking')
             warrior.combat = _.assign(warrior.combat, originalCombatStats)
             // wait before attacking again
             warrior.combat.attackTimer = game.time.now + Math.min(Phaser.Timer.SECOND, Phaser.Timer.SECOND / warrior.combat.attackSpeed) 
             warrior.abilities.passive.active = false
-            warrior.loadTexture(warrior.info.fighterClass)
+            warrior.loadTexture(`${warrior.info.team}_${warrior.info.fighterClass}`)
           }
           // stop beserking when duration is up
           game.time.events.add(Phaser.Timer.SECOND * ability.duration, stopBeserking, hero).autoDestroy = true
@@ -997,14 +941,13 @@ window.onload = () => {
       forEachAliveInTeam(team, executeOnHero)
     }
 
-    const distanceToMiddle = (sprite) => {
+    function distanceToMiddle (sprite) {
       const d1 = Math.abs(sprite.left - getCameraCenterX())
       const d2 = Math.abs(sprite.right - getCameraCenterX())
-      // console.info('dist middle', d1, d2)
       return Math.min(d1,d2)
     }
 
-    const updateHero = (hero, heroGroup) => {
+    function updateHero (hero, heroGroup) {
       const index = hero.z
       if (game.time.now >= hero.combat.beginHealthRegenAt) {
         healHero(hero, hero.healthRegen)
