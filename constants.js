@@ -24,7 +24,7 @@ function Constants (staging = false) {
 
   this.classes = {
     "default": {
-      "maxHealth": 330,
+      "maxHealth": 730,
       // "maxHealth": 3000,
       "healthRegen": 0.5,
       "combat": {

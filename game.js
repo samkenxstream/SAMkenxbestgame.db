@@ -72,21 +72,19 @@ window.onload = () => {
 
   const players = {
     initialHeroes: [
-      c.classes.warrior.key,
       c.classes.mage.key,
+      c.classes.warrior.key,
     ],
-    state: 'idle',
+    state: '',
     onHeroKilled: onPlayerKilled
   }
 
   const enemies = {
     initialHeroes: [
-      // c.classes.warrior.key,
-      c.classes.mage.key,
-      c.classes.mage.key,
+      c.classes.warrior.key,
       c.classes.warrior.key,
     ],
-    state: 'idle',
+    state: '',
     onHeroKilled: onEnemyKilled
   }
 
@@ -105,8 +103,8 @@ window.onload = () => {
     // PARTICLES
     // this.game.load.image('arrow', 'images/particles/arrow.png')
     this.game.load.image('collectible1', 'images/particles/gold_coin_v3.gif')
-    // this.game.load.spritesheet('flames', 'images/particles/animated/flames.png', 32, 40)
-    this.game.load.spritesheet('flames', 'images/particles/animated/.gif', 48, 167)
+    this.game.load.spritesheet('flames', 'images/particles/animated/flames.png', 32, 40)
+    this.game.load.atlas('firebreath', 'images/particles/animated/firebreath_sheet.png', 'images/particles/animated/firebreath_sheet_atlas.json')
 
     this.game.load.image('chest_closed', 'images/chest_closed.png')
     this.game.load.image('chest_open', 'images/chest_open.png')
@@ -126,14 +124,13 @@ window.onload = () => {
 
     const baseClass = c.classes[fighterClass]
     const baseDefault = c.classes.default
-    // numFromFront is the number
-    const fighter = this
+
     let xDirection
     let flipHorizontally = false
 
     if (team === c.teams.player) {
       xDirection = 1
-      flipHorizontally = true
+      // flipHorizontally = true
     } else if (team === c.teams.enemy) {
       xDirection = -1
     }
@@ -193,24 +190,24 @@ window.onload = () => {
       height: 8,
       bar: hpStyle.bar,
       bg: hpStyle.bg,
-      flipped: (team === c.teams.player)
     })
     this.addChild(this.healthBar.getBarSprite())
 
-    this.energy = 0
-    this.maxEnergy = 100 // value when ability is cast
+    if (team === c.teams.player) {
+      this.energy = 0
+      this.maxEnergy = 100 // value when ability is cast
 
-    this.energyBar = new HealthBar(game, {
-      y: -30,
-      x: 0,
-      width: 50,
-      height: 8,
-      bar: resourceBarStyle.bar,
-      bg: resourceBarStyle.bg,
-      flipped: (team === c.teams.player),
-      percent: this.energy
-    })
-    this.addChild(this.energyBar.getBarSprite())
+      this.energyBar = new HealthBar(game, {
+        y: -30,
+        x: 0,
+        width: 50,
+        height: 8,
+        bar: resourceBarStyle.bar,
+        bg: resourceBarStyle.bg,
+        percent: this.energy
+      })
+      this.addChild(this.energyBar.getBarSprite())
+    }
 
     // combat values and hit damage
     function hitDamage () {
@@ -265,7 +262,7 @@ window.onload = () => {
 
       coinsLabel.addChild(coinsLabelIcon)
 
-      this.game.world.bringToTop(coinsLabel)
+      // this.game.world.bringToTop(coinsLabel)
 
       // Create a tween to grow / shrink the coins label
       const coinsLabelTween = this.game.add.tween(coinsLabel.scale).to({
@@ -280,10 +277,16 @@ window.onload = () => {
         labelTween: coinsLabelTween,
       }
     }
-    game.stage.backgroundColor = '#dddddd'
+
+    this.game.stage.backgroundColor = '#dddddd'
+
+    // display order -- background first, foreground last
+    enemies.sprites = this.game.add.group()
+    players.sprites = this.game.add.group()
+    effects = this.game.add.group()
+    foreground = this.game.add.group()
 
     this.game.time.advancedTiming = true // so we can read fps to calculate attack delays in seconds
-    this.game.physics.startSystem(Phaser.Physics.ARCADE)
 
     if (chest) {
       this.game.physics.arcade.enable(chest)
@@ -303,7 +306,6 @@ window.onload = () => {
 
     const playerBaseX = this.game.world.centerX - (HERO_WIDTH / 2 + COMBAT_DISTANCE / 2)
 
-    enemies.sprites = this.game.add.group()
     _.forEach(enemies.initialHeroes, (fighterClass, index) => {
       const hero = new Fighter(enemies, {
         team: c.teams.enemy,
@@ -315,7 +317,6 @@ window.onload = () => {
       enemies.sprites.add(hero)
     })
 
-    players.sprites = this.game.add.group()
     _.forEach(players.initialHeroes, (fighterClass, index) => {
       const hero = new Fighter(players, {
         team: c.teams.player,
@@ -339,6 +340,8 @@ window.onload = () => {
     })
 
     coinEmitter = this.game.add.emitter(0, 0, 100) // max 100 coins at once
+    foreground.add(coinEmitter)
+
     coinEmitter.maxParticleScale = 0.3
     coinEmitter.minParticleScale = 0.3
 
@@ -470,6 +473,7 @@ window.onload = () => {
 
     // render a hit splat
     const hitSplat = game.add.graphics()
+    foreground.add(hitSplat)
     hitSplat.boundsPadding = 0
 
     const splatColors = c.colors.hitSplat.default
@@ -496,9 +500,6 @@ window.onload = () => {
     hitText.setTextBounds(-30, damage.critical ? 0 : 3, 80, 30)
 
     hitSplat.addChild(hitText)
-    if (victim.info.team === c.teams.player) {
-      hitSplat.scale.x *= -1
-    }
     hitSplat.lifespan = Math.max(300, Math.min(1200, (1000 / attacker.combat.attackSpeed) - 300))
     hitSplat.events.onKilled.add(() => hitSplat.destroy(true))
 
@@ -562,7 +563,6 @@ window.onload = () => {
     playerAtFront.updateInputEnabled(playerAtFront.z)
     // playerToPush.fixedToCamera = false
     players.sprites.swap(playerToPush, playerAtFront)
-    // players.sprites.bringToTop(playerAtFront)
 
     const tweenFrontPlayerBackwards = game.add.tween(playerAtFront).to({
       x: playerToPush.x,
@@ -798,19 +798,53 @@ window.onload = () => {
       })
     }
 
-    const burnTeam = (attacker, targetTeam = c.teams.enemy, fixedDamageValue) => {
+    const breatheFireAttack = (attacker, targetTeam = c.teams.enemy, fixedDamageValue) => {
+      // place fire breathe on side towards other team
+      const teamFlip = attacker.info.xDirection
+      const flamesRect = {
+        x: getCameraCenterX() - teamFlip * 12,
+        y: game.world.height - attacker.height * 0.7
+      }
+      const flames = this.game.make.sprite(flamesRect.x, flamesRect.y, 'firebreath')
+      effects.add(flames)
+      // flames.fixedToCamera = true
+
+      // positioning
+      flames.angle = teamFlip * 92
+      flames.scale.setTo(0.8, 1.5)
+      flames.anchor.x = 0.5
+      flames.anchor.y = 1
+      flames.lifespan = Math.min((Phaser.Timer.SECOND / attacker.combat.attackSpeed) * 1.1, Phaser.Timer.SECOND * 1.0)
+
+      // aesthetics
+      flames.animations.add('flames')
+      flames.animations.play('flames', 45, true)
+      flames.events.onKilled.add(() => flames.destroy())
+      // TEMP uncomment this
+      // flames.alpha = 0.63
+
+      this.game.add.existing(flames)
+
+      const damageValue = fixedDamageValue || attacker.combat.hitDamage().value
+
+      forEachAliveInTeam(targetTeam, victim => {
+        dealDamage(attacker, victim, damageValue)
+      })
+    }
+
+    const burnTeamAbilityTick = (attacker, targetTeam = c.teams.enemy, fixedDamageValue, ability) => {
       const damageValue = fixedDamageValue || attacker.combat.hitDamage().value
       forEachAliveInTeam(targetTeam, victim => {
         const firePosition = {
           x: 0,
-          y: victim.height / 2
+          y: victim.height / 2 - 6
         }
         const fireSprite = this.game.make.sprite(firePosition.x, firePosition.y, 'flames')
         fireSprite.scale.setTo(1.5, 1)
         fireSprite.anchor.setTo(0.5, 0)
-        fireSprite.lifespan = Math.min((1000 / attacker.combat.attackSpeed) / 1.7, 1200)
+        fireSprite.lifespan = Phaser.Timer.SECOND * ability.duration
         fireSprite.animations.add('flicker')
-        fireSprite.animations.play('flicker', 10, true)
+        fireSprite.animations.play('flicker', 15, true)
         fireSprite.events.onKilled.add(() => fireSprite.destroy())
         victim.addChild(fireSprite)
         dealDamage(attacker, victim, damageValue)
@@ -828,11 +862,7 @@ window.onload = () => {
           break
         case c.classes.mage.key:
           attacker.body.velocity.y = -85
-          burnTeam(attacker, victim.info.team)
-          break
-        case c.classes.priest.key:
-          attacker.body.velocity.y = -105
-          dealDamage(attacker, victim)
+          breatheFireAttack(attacker, victim.info.team)
           break
       }
 
@@ -843,6 +873,7 @@ window.onload = () => {
       // render a hit splat
       const hitSplat = this.game.add.graphics()
       hitSplat.boundsPadding = 0
+      foreground.add(hitSplat)
 
       const fillColor = style.fill
       const lineColor = style.stroke
@@ -866,9 +897,7 @@ window.onload = () => {
       hitText.setTextBounds(-30, 3, 80, 30)
 
       hitSplat.addChild(hitText)
-      if (hero.info.team === c.teams.player) {
-        hitSplat.scale.x *= -1
-      }
+
       hitSplat.lifespan = lifespan
       hitSplat.events.onKilled.add(() => hitSplat.destroy(true))
       hero.addChild(hitSplat)
@@ -912,7 +941,7 @@ window.onload = () => {
 
           const burnTimer = game.time.create(true)
           function burnTick () {
-            burnTeam(hero, targetTeam, tickDamageValue)
+            burnTeamAbilityTick(hero, targetTeam, tickDamageValue, ability)
           }
           const endTime = Phaser.Timer.SECOND * ability.duration * ability.repeatCount
           burnTimer.repeat(Phaser.Timer.SECOND * ability.duration, ability.repeatCount, burnTick, hero)
@@ -1116,15 +1145,15 @@ window.onload = () => {
   function render () {
     this.game.debug.geom(lineCameraMiddle, 'grey')
     this.game.debug.text(players.state, 5, 20, 'blue')
-    this.game.debug.text(enemies.state, this.game.camera.width - 180, 20, 'orange')
+    this.game.debug.text(enemies.state, this.game.camera.view.width - 110, 20, 'orange')
 
-    let i = 0
+    /*let i = 0
     players.sprites.forEachAlive(player => {
       const childZ = player.z
       this.game.debug.text(childZ, (game.camera.width/2) - 40 - i * (HERO_WIDTH + 11), 30, 'black')
       this.game.debug.text(player.info.fighterClass, (game.camera.width/2) - 70 - i * (HERO_WIDTH + 10), 12, 'black', {align: 'center'})
       i++
-    })
+    })*/
     // this.game.debug.spriteInputInfo(players.sprites.getFurthestFrom({x: game.camera.view.centerX, y: 0}), this.game.camera.width / 2 - 50, 20, 'yellow')
   }
 }
