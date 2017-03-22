@@ -24,13 +24,13 @@ function Constants (staging = false) {
 
   this.classes = {
     "default": {
-      "maxHealth": 300,
+      "maxHealth": 330,
       // "maxHealth": 3000,
       "healthRegen": 0.5,
       "combat": {
         "range": 0,
-        // "attackSpeed": 0.45,
-        "attackSpeed": 1.7,
+        "attackSpeed": 0.45,
+        // "attackSpeed": 1.7,
         "minHitDamage": 40.0,
         "maxHitDamage": 50.0,
         "critChance": 0.10,
@@ -59,7 +59,7 @@ function Constants (staging = false) {
       abilities: {
         passive: {
           name: 'beserk',
-          duration: 3.0,
+          duration: 2.3,
           active: false
         }
       },
@@ -72,7 +72,14 @@ function Constants (staging = false) {
         "minHitDamage": def.combat.minHitDamage * (2 / 3),
         "maxHitDamage": def.combat.maxHitDamage * (2 / 3),
         "critChance": 0.07
-      }
+      },
+      abilities: {
+        passive: {
+          name: 'apply_burn',
+          duration: 0.8,
+          repeatCount: 3
+        }
+      },
     },
     "archer": {
       "key": "archer",
