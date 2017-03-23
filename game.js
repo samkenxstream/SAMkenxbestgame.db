@@ -30,7 +30,10 @@ window.onload = () => {
 
   let lineCameraMiddle,
     coinEmitter,
-    chest
+    chest,
+    effects,
+    foreground
+
   let zone = 0
 
   // this = players OR enemies
@@ -1086,9 +1089,12 @@ window.onload = () => {
   }
 
   function render () {
-    this.game.debug.geom(lineCameraMiddle, 'grey')
-    this.game.debug.text(players.state, 5, 20, 'blue')
-    this.game.debug.text(enemies.state, this.game.camera.view.width - 110, 20, 'orange')
+    if (window.location.href.indexOf('surge.sh') === -1) {
+      // staging
+      this.game.debug.geom(lineCameraMiddle, 'grey')
+      this.game.debug.text(players.state, 5, 20, 'blue')
+      this.game.debug.text(enemies.state, this.game.camera.view.width - 110, 20, 'orange')
+    }
 
     /*let i = 0
     players.sprites.forEachAlive(player => {
