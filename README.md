@@ -1,7 +1,27 @@
 # gacha4good
 Gacha game for the gamingforgood website. Players collect streamers to fight for them against the evil twitch emotes.
 
-## Combat
-attackSpeed: attacks per second
+## TODO
+- [x] remove splat text
+- [x] some visual indication of damage taken
+- [ ] ..
 
-## Bugs
+- [ ] replace enemy sprites with emote pics like Kappa and PogChamp
+- [ ] list emotes up top
+- [ ] kill a kapaa get a kappa
+- [ ] level up buttons
+  - [ ] cooler effects based on combat level:
+    - [ ] two flame sprites instead of one
+    - [ ] jump higher on atk
+    - [ ] increased (size) scale of sprite
+    - [ ] at milestone levels: sunglasses or maybe a hat. -- how? hero.addChild(sunglassesSprite)
+    - [ ] tint color of the hero -- how? heroSprite.tint
+
+// Spend [K] to lvl up Warrior  
+// Spend [P] to lvl up Mage
+
+| LVL UP | Warrior  
+|  4 [K] | Lvl 1
+
+| LVL UP | Mage  
+| 10 [P] | Lvl 2

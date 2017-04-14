@@ -123,15 +123,24 @@ HealthBar.prototype.setPercent = function (newValue, tween = true) {
   if (newValue > 100) newValue = 100
 
   var newWidth = (newValue * this.config.width) / 100
+  var oldWidth = this.barSprite.width;
 
   if (tween) {
-    this.tweenWidthTo(newWidth)
+    if (newWidth < oldWidth) {
+      // health decreasing
+      this.tweenWidthTo(newWidth, true)
+    } else {
+      this.tweenWidthTo(newWidth)
+    }
   } else {
     this.setWidth(newWidth)
   }
 }
 
-HealthBar.prototype.tweenWidthTo = function (newWidth) {
+HealthBar.prototype.tweenWidthTo = function (newWidth, hurting) {
+  if (hurting) {
+    this.game.add.tween(this.barSprite).to({ tint: 0xffa0a0 }, Math.min(this.config.animationDuration, 80), Phaser.Easing.None, true, 0, 0, true) // last arg is yoyo=true
+  }
   this.game.add.tween(this.barSprite).to({ width: newWidth }, this.config.animationDuration, Phaser.Easing.Quadratic.Out, true)
 }
 

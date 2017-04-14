@@ -189,7 +189,6 @@ window.onload = () => {
 
     console.log(`${this.info.team} ${this.info.fighterClass}, ${this.health} hp`)
 
-
     if (team === c.teams.player) {
       const canClickToSwap = true
       // this.input.useHandCursor = canClickToSwap
@@ -509,7 +508,8 @@ window.onload = () => {
     victim.damage(damageDealt)
     victim.combat.beginHealthRegenAt = game.time.now + (Phaser.Timer.SECOND * c.delays.HEALTH_REGEN)
 
-    renderHitNumberText(victim.x, damageDealt)
+    // DISABLED
+    // renderHitNumberText(victim.x, damageDealt)
 
     updateHealthBar(victim, victim.healthBar)
 
@@ -958,8 +958,10 @@ window.onload = () => {
       }
 
       const isAtFront = hero.z === heroGroup.getFirstAlive().z
-      if (!isAtFront) {
-
+      if (hero.energy && !isAtFront) {
+        // lose energy points
+        // hero.energy -= 0.2
+        // hero.energyBar.setPercent(hero.energy)
       }
 
       hero.body.velocity.x = 0
