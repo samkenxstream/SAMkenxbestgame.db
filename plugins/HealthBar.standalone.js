@@ -139,6 +139,7 @@ HealthBar.prototype.setPercent = function (newValue, tween = true) {
 
 HealthBar.prototype.tweenWidthTo = function (newWidth, hurting) {
   if (hurting) {
+    // Health bar flashes, flash a darker color
     this.game.add.tween(this.barSprite).to({ tint: 0xffa0a0 }, Math.min(this.config.animationDuration, 80), Phaser.Easing.None, true, 0, 0, true) // last arg is yoyo=true
   }
   this.game.add.tween(this.barSprite).to({ width: newWidth }, this.config.animationDuration, Phaser.Easing.Quadratic.Out, true)
