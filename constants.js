@@ -119,6 +119,25 @@ function Constants (staging = false) {
     }
   })
 
+  this.emotes = {
+    default: {
+      sentiment: 0, // from -1.00 to +1.00
+      funny: 0 // from serious (-1.0) to hilarious (+1.0)
+    },
+    KappaPride: {
+      sentiment: 0.5,
+      funny: 0.4
+    },
+    EleGiggle: {
+      sentiment: 0.3,
+      funny: 0.8
+    },
+    FeelsBadMan: {
+      sentiment: -0.6,
+      funny: -0.7
+    }
+  }
+
   this.projectiles = {
     "arrow": {
       "key": "arrow"

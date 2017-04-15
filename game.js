@@ -14,7 +14,9 @@ window.onload = () => {
 
   const HERO_MOVEMENT_VELOCITY = 80
   const HERO_WIDTH = 55 // was 60 in version <= 0.1.5
-  const HERO_HEIGHT = 60
+  const HERO_HEIGHT = 60 // number used for player and enemy sprite calculations
+  const ENEMY_WIDTH = 56 // default enemy (emote) width
+  const ENEMY_HEIGHT = 56 // default enemy (emote) height
 
   const DISTANCE_BETWEEN_HEROES = HERO_WIDTH + 12
   const COMBAT_DISTANCE = 28
@@ -111,6 +113,14 @@ window.onload = () => {
     this.game.load.image('enemy_mage', `images/characters/${c.teams.enemy}_${c.classes.mage.key}.png`)
     // this.game.load.image(c.classes.archer.key, 'images/characters/archer_emote_60x80.png')
     // this.game.load.image(c.classes.priest.key, 'images/characters/mage.png')
+
+    // EMOTES
+    _.forEach(c.emotes, (emoteData, emoteId) => {
+      if (emoteId == 'default') {
+        return
+      }
+      this.game.load.image(emoteId, `images/emotes/${emoteId}.png`)
+    });
 
     // PARTICLES
     // this.game.load.image('arrow', 'images/particles/arrow.png')
@@ -515,7 +525,7 @@ window.onload = () => {
 
     if (victim.info.team === c.teams.enemy) {
       // drop particles
-      // dropCoins(victim, 2, null, false)
+      dropCoins(victim, 2, null, false)
     }
   }
 
