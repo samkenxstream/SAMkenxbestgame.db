@@ -1,8 +1,9 @@
-/* global c */
+const Constants = require('../constants')
+const c = new Constants()
 const defaultClass = 'warrior'
 
-function Emote ({emoteId, x, y, combatLevel = 0, maxHealth = null, onKilled}) {
-  if (c.emotes.hasOwnProperty(emoteId)) {
+function EmoteWarrior (game, {emoteId, x, y, combatLevel = 0, onKilled}) {
+  if (!c.emotes.hasOwnProperty(emoteId)) {
     console.error(`Cannot make emote sprite with invalid emoteId '${emoteId}' at xy (${x}, ${y})`)
     return
   }
@@ -12,6 +13,8 @@ function Emote ({emoteId, x, y, combatLevel = 0, maxHealth = null, onKilled}) {
   const baseDefault = c.classes.default
 
   this.anchor.setTo(0.5, 0)
+
+  this.name = emoteId
 
   this.info = {
     team: c.teams.enemy,
@@ -35,15 +38,9 @@ function Emote ({emoteId, x, y, combatLevel = 0, maxHealth = null, onKilled}) {
 
   console.log(`${emoteId} ${this.info.defaultClass}, ${this.health} hp`)
 
-  if (team === c.teams.player) {
-    const canClickToSwap = true
-    // this.input.useHandCursor = canClickToSwap
-    this.inputEnabled = canClickToSwap
-  }
-
   const hpStyle = {
-    bar: c.colors.healthBars[team].bar,
-    bg: c.colors.healthBars[team].bg
+    bar: c.colors.healthBars.enemy.bar,
+    bg: c.colors.healthBars.enemy.bg
   }
 
   const resourceBarStyle = {
@@ -90,8 +87,10 @@ function Emote ({emoteId, x, y, combatLevel = 0, maxHealth = null, onKilled}) {
     const randomDamage = Math.ceil(this.combat.minHitDamage + (this.combat.maxHitDamage - this.combat.minHitDamage) * Math.random())
     return { value: randomDamage, critical: false }
   }
-  this.events.onKilled.add(onHeroKilled.bind(teamObject, this))
+  this.events.onKilled.add(onKilled)
 }
 
-Fighter.prototype = Object.create(Phaser.Sprite.prototype);
-Fighter.prototype.constructor = Fighter;
+EmoteWarrior.prototype = Object.create(Phaser.Sprite.prototype);
+EmoteWarrior.prototype.constructor = EmoteWarrior;
+
+module.exports = EmoteWarrior;

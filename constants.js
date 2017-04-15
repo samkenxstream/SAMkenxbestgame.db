@@ -24,7 +24,7 @@ function Constants (staging = false) {
 
   this.classes = {
     "default": {
-      "maxHealth": 730,
+      "maxHealth": 130,
       // "maxHealth": 3000,
       "healthRegen": 0.5,
       "combat": {
@@ -121,22 +121,29 @@ function Constants (staging = false) {
 
   this.emotes = {
     default: {
+      id: null,
       sentiment: 0, // from -1.00 to +1.00
       funny: 0 // from serious (-1.0) to hilarious (+1.0)
     },
     KappaPride: {
+      id: "KappaPride",
       sentiment: 0.5,
       funny: 0.4
     },
     EleGiggle: {
+      id: "EleGiggle",
       sentiment: 0.3,
       funny: 0.8
     },
     FeelsBadMan: {
+      id: "FeelsBadMan",
       sentiment: -0.6,
       funny: -0.7
     }
   }
+  this.emoteExists = (emoteId) => (
+    !!_.get(this.emotes, [emoteId, 'id'])
+  )
 
   this.projectiles = {
     "arrow": {

@@ -1,4 +1,4 @@
-/* global Phaser, HealthBar, _ */
+/* global Phaser, _, HealthBar, EmoteFighter */
 /* eslint-disable comma-dangle */
 
 const Constants = require('./constants')
@@ -6,17 +6,28 @@ const c = new Constants()
 
 const VanishingText = require('./components/Text/VanishingText')
 const StyledText = require('./components/Text/StyledText')
+const EmoteWarrior = require('./components/EmoteFighter.js')
 
 window.onload = () => {
   const MIN_TWITCH_WIDTH = 644
   const GAME_WIDTH = MIN_TWITCH_WIDTH
-  const GAME_HEIGHT = 125
+  const GAME_HEIGHT = 140
 
   const HERO_MOVEMENT_VELOCITY = 80
+
   const HERO_WIDTH = 55 // was 60 in version <= 0.1.5
   const HERO_HEIGHT = 60 // number used for player and enemy sprite calculations
-  const ENEMY_WIDTH = 56 // default enemy (emote) width
-  const ENEMY_HEIGHT = 56 // default enemy (emote) height
+
+  const ENEMY_WIDTH_PIXELS = 56 // default enemy (emote) width
+  const ENEMY_HEIGHT_PIXELS = 56 // default enemy (emote) height
+
+  const ENEMY_WIDTH = 36 // default enemy (emote) width
+  const ENEMY_HEIGHT = 36 // default enemy (emote) height
+
+  const DISTANCE_BETWEEN_EMOTES = ENEMY_WIDTH + Math.min(12, ENEMY_WIDTH * 0.1)
+
+  const PLAYER_INITIAL_COMBAT_LEVEL = 6
+  const ENEMY_INITIAL_COMBAT_LEVEL = 0
 
   const DISTANCE_BETWEEN_HEROES = HERO_WIDTH + 12
   const COMBAT_DISTANCE = 28
@@ -47,7 +58,8 @@ window.onload = () => {
   }
 
   const onEnemyKilled = function (enemy) {
-    dropCoins(enemy, 5)
+    // dropCoins(enemy, 5)
+    dropEmotes(enemy, enemy.name, 5)
     if (this.sprites.countLiving() === 0) {
       // last enemy killed
       // expand world to include another zone
@@ -140,13 +152,6 @@ window.onload = () => {
 
     Phaser.Sprite.call(this, game, x, y, `${team}_${c.classes[fighterClass].key}`);
 
-    this.updateInputEnabled = (z) => {
-      const canClickToSwap = true ||z > 0
-
-      this.input.useHandCursor = canClickToSwap
-      this.inputEnabled = canClickToSwap
-    }
-
     const hitDamage = () => {
       if (Math.random() < this.combat.critChance) {
         // we got a critical hit!
@@ -199,12 +204,6 @@ window.onload = () => {
 
     console.log(`${this.info.team} ${this.info.fighterClass}, ${this.health} hp`)
 
-    if (team === c.teams.player) {
-      const canClickToSwap = true
-      // this.input.useHandCursor = canClickToSwap
-      this.inputEnabled = canClickToSwap
-    }
-
     const hpStyle = {
       bar: c.colors.healthBars[team].bar,
       bg: c.colors.healthBars[team].bg
@@ -232,6 +231,7 @@ window.onload = () => {
     this.addChild(this.healthBar.getBarSprite())
 
     if (team === c.teams.player) {
+      // ENERGY aka RAGE BAR
       this.energy = 0
       this.maxEnergy = 100 // value when ability is cast
 
@@ -245,6 +245,26 @@ window.onload = () => {
         percent: this.energy
       })
       this.addChild(this.energyBar.getBarSprite())
+
+      /* INPUT */
+      // CLICK ON ME
+      this.updateInputEnabled = (enable) => {
+        this.inputEnabled = enable
+        // this.input.useHandCursor = canClickToSwap
+      }
+
+      // MOUSEOVER ME
+      const onOver = () => {
+        if (this.z != 0) {
+          this.normalTint = this.tint
+          this.tint = 0xb0b0dd
+        }
+      }
+      const onOut = () => {
+        this.tint = this.normalTint
+      }
+      this.events.onInputOver.add(onOver, this)
+      this.events.onInputOut.add(onOut, this)
     }
 
     // combat values and hit damage
@@ -280,11 +300,10 @@ window.onload = () => {
 
       // create the coins label
       const coinsLabel = this.game.add.text(this.game.world.centerX, 0, '0', coinsLabelStyle)
-      const coinsLabelIcon = this.game.add.sprite(0, 0, 'collectible1')
-      coinsLabelIcon.scale.setTo(0.4)
+      const coinsLabelIcon = this.game.add.sprite(0, 0, c.emotes.KappaPride.id) // previously 'collectible1'
+      coinsLabelIcon.width = 30
+      coinsLabelIcon.height = 30
       coinsLabelIcon.anchor.setTo(1, 0)
-      coinsLabelIcon.x = -4
-      coinsLabelIcon.y = coinsLabel.height / 4
 
       coinsLabel.anchor.setTo(0, 0)
       coinsLabel.align = 'center'
@@ -335,16 +354,17 @@ window.onload = () => {
 
     const playerBaseX = this.game.world.centerX - (HERO_WIDTH / 2 + COMBAT_DISTANCE / 2)
 
-    _.forEach(enemies.initialHeroes, (fighterClass, index) => {
-      const hero = new Fighter(enemies, {
-        team: c.teams.enemy,
-        fighterClass,
-        x: ENEMY_BASE_X + DISTANCE_BETWEEN_HEROES * index,
-        y: this.game.world.height - HERO_HEIGHT,
-        onHeroKilled: enemies.onHeroKilled
-      })
-      enemies.sprites.add(hero)
-    })
+    // _.forEach(enemies.initialHeroes, (fighterClass, index) => {
+    //   const hero = new Fighter(enemies, {
+    //     team: c.teams.enemy,
+    //     fighterClass,
+    //     x: ENEMY_BASE_X + DISTANCE_BETWEEN_HEROES * index,
+    //     y: this.game.world.height - HERO_HEIGHT,
+    //     onHeroKilled: enemies.onHeroKilled,
+    //     combatLevel: ENEMY_INITIAL_COMBAT_LEVEL
+    //   })
+    //   enemies.sprites.add(hero)
+    // })
 
     _.forEach(players.initialHeroes, (fighterClass, index) => {
       const hero = new Fighter(players, {
@@ -353,9 +373,10 @@ window.onload = () => {
         x: playerBaseX - DISTANCE_BETWEEN_HEROES * index,
         y: this.game.world.height - HERO_HEIGHT,
         onHeroKilled: players.onHeroKilled,
-        combatLevel: 2
+        combatLevel: PLAYER_INITIAL_COMBAT_LEVEL
       })
       players.sprites.add(hero)
+      hero.inputEnabled = true
       hero.events.onInputUp.add((player, pointer) => {
         const isOver = Phaser.Rectangle.containsPoint(player.getBounds(), pointer)
         if (isOver) {
@@ -368,18 +389,19 @@ window.onload = () => {
           }
         }
       })
-      hero.updateInputEnabled(hero.z)
+      hero.updateInputEnabled(hero.z > 0)
+      window.setTimeout(() => { hero.tint = 0xffffff; } , 99)
+      
     })
 
     coinEmitter = this.game.add.emitter(0, 0, 100) // max 100 coins at once
-    foreground.add(coinEmitter)
 
-    coinEmitter.maxParticleScale = 0.3
-    coinEmitter.minParticleScale = 0.3
+    coinEmitter.maxParticleScale = 0.5
+    coinEmitter.minParticleScale = 0.5
 
     // spriteKey, frame, quantity, collide?, collideWorldBounds?
-    // i think that the quantity chosen here restricts the max quantity generated in one call
     coinEmitter.makeParticles('collectible1', 0, undefined, false, true)
+
     coinEmitter.gravity = 600
     const animateAddCoins = (coin) => {
       if (!coin.alive) {
@@ -387,6 +409,57 @@ window.onload = () => {
       }
     }
     coinEmitter.callAll('events.onKilled.add', 'events.onKilled', animateAddCoins)
+
+    foreground.add(coinEmitter)
+
+    createEmoteEmitter()
+  }
+
+  /* EMOTE EMITTER */
+  function createEmoteEmitter() {
+     // add emote emitters group to foreground (the parent group)
+    
+    game.emoteEmit = game.add.emitter(0, 0) // max 100 sprites at once
+    const ee = game.emoteEmit
+
+    ee.minParticleScale = .35
+    ee.maxParticleScale = .35
+
+    ee.gravity = 800
+    ee.lifespan = 620
+
+    const initialEmoteId = c.emotes.KappaPride.id
+    // frame, maxParticles (EVER), collide?, collideWorldBounds?
+    ee.initialState = [0, undefined, false, true]
+    ee.makeParticles(initialEmoteId, ...ee.initialState)
+    ee.name = initialEmoteId
+
+    ee.callAll('events.onKilled.add', 'events.onKilled', (sprite) => {
+      if (!sprite.alive) {
+        createCoinsIncrementAnimation(sprite, 1)
+      }
+    })
+
+    foreground.add(ee);
+  }
+
+  function dropEmotes (objWithXY, emoteId, count = 1) {
+    game.emoteEmit.at(objWithXY)
+    if (game.emoteEmit.name != emoteId) {
+      if (c.emoteExists(emoteId)) {
+        console.info(`Changed emote emitter to '${emoteId}' particles`)
+        game.emoteEmit.makeParticles(emoteId, ...game.emoteEmit.initialState)
+        game.emoteEmit.name = emoteId
+      } else {
+        console.error(`Cannot drop emote(s) with invalid emoteId '${emoteId}', at location:`, objWithXY)
+        return
+      }
+    }
+    if (game.emoteEmit.total >= game.emoteEmit.maxParticles) {
+      console.info(game.emoteEmit.total)
+      game.emoteEmit.maxParticles = Math.floor(game.emoteEmit.total * 1.5);
+    }
+    game.emoteEmit.start(true, game.emoteEmit.lifespan, undefined, count)
   }
 
   function makeEndMenu () {
@@ -482,6 +555,7 @@ window.onload = () => {
     // destroy score label
     // trigger the total score labels animation
     coinTween.onComplete.add(function () {
+      coin.kill()
       coin.destroy()
       game.coins.labelTween.start()
       game.coins.bufferValue += coinValue
@@ -525,7 +599,8 @@ window.onload = () => {
 
     if (victim.info.team === c.teams.enemy) {
       // drop particles
-      dropCoins(victim, 2, null, false)
+      // dropCoins(victim, 2, null, false)
+      dropEmotes(victim, victim.name);
     }
   }
 
@@ -556,8 +631,11 @@ window.onload = () => {
 
     players.sprites.swap(playerToPush, playerAtFront)
 
-    playerToPush.updateInputEnabled(playerToPush.z)
-    playerAtFront.updateInputEnabled(playerAtFront.z)
+    playerToPush.updateInputEnabled(false)
+    playerAtFront.updateInputEnabled(true)
+
+    playerAtFront.normalTint = playerToPush.tint
+    playerAtFront.tint = 0xaaaaaa
 
     const tweenFrontPlayerBackwards = game.add.tween(playerAtFront).to({
       x: playerToPush.x,
@@ -574,6 +652,7 @@ window.onload = () => {
     // the player being pushed to the front needs to wait to attack
     // this prevents a player from spam swapping their heroes to attack with each as often as possible
     playerToPush.combat.attackTimer = playerAtFront.combat.attackTimer
+    playerToPush.tint = 0xffffff
   }
 
   function spawnEnemy (placesFromFront = 0, combatLevel = 0, fighterClass = c.classes.warrior.key) {
@@ -594,9 +673,23 @@ window.onload = () => {
       fighterClass,
       x: x + DISTANCE_BETWEEN_HEROES * placesFromFront,
       y: game.world.height - HERO_HEIGHT,
-      onHeroKilled: enemies.onHeroKilled
+      onHeroKilled: enemies.onHeroKilled.bind(enemies)
     })
     enemies.sprites.add(newEnemy)
+  }
+
+  function spawnEnemyEmote (placesFromFront = 0, combatLevel = 0, emoteId) {
+    const x = getCameraCenterX() + (ENEMY_WIDTH / 2) + (COMBAT_DISTANCE / 2) + 1
+    const enemyEmote = new EmoteWarrior(game, {
+      emoteId: c.emotes.KappaPride && 'KappaPride',
+      combatLevel,
+      x: x + DISTANCE_BETWEEN_EMOTES * placesFromFront,
+      y: game.world.height - ENEMY_HEIGHT,
+      onKilled: enemies.onHeroKilled.bind(enemies)
+    })
+    enemyEmote.width = ENEMY_WIDTH
+    enemyEmote.height = ENEMY_HEIGHT
+    enemies.sprites.add(enemyEmote)
   }
 
   function dropCoins (pointer, count = 3, lifespan = 750, explode = true) {
@@ -1051,7 +1144,8 @@ window.onload = () => {
       case c.states.dead:
         if (distanceToNextFight === 0) {
           for (let count = 1; (count <= zone + 1) && (count <= MAX_ENEMIES_PER_ZONE); count++) {
-            spawnEnemy(count - 1, zone)
+            // spawnEnemy(count - 1, zone)
+            spawnEnemyEmote(count - 1, zone)
           }
         }
         break
