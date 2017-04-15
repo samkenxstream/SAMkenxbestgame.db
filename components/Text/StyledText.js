@@ -12,7 +12,7 @@ function StyledText (game, textString, rgb, gradient, styleOverwite) {
     strokeThickness: th / 26,
   }, styleOverwite)
 
-  Phaser.Text.call(this, game, 0, 100, textString, textStyle)
+  Phaser.Text.call(this, game, 0, 0, textString, textStyle)
 
   if (gradient) {
     const rgbEnd = {

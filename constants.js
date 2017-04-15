@@ -213,6 +213,36 @@ function Constants (staging = false) {
     "AUTO_CLICK": 3.8,
     "HEALTH_REGEN": 5.5,
   }
+
+  const cThis = this
+  this.upgrades = {
+    levelUp: {
+      mage: {
+        unit: cThis.emotes.KappaPride.id,
+        baseCost: Math.floor(Math.pow(Math.abs(cThis.emotes.KappaPride.sentiment) + Math.abs(cThis.emotes.KappaPride.funny), 0.8) * 8),
+      },
+      warrior: {
+        unit: cThis.emotes.EleGiggle.id,
+        baseCost: Math.floor(Math.pow(Math.abs(cThis.emotes.EleGiggle.sentiment) + Math.abs(cThis.emotes.KappaPride.funny), 0.8) * 8),
+      },
+    }
+  }
+  this.upgrades.levelUp.getCostFor = (heroId, curLevel) => {
+    if (!_.isString(heroId) || !_.isNumber(curLevel)) {
+      console.error(`getCostFor called with invalid args.\nheroId: ${heroId}\ncurLevel: ${curLevel}`)
+    }
+    const costData = this.upgrades.levelUp[heroId]
+    const unit = costData.unit
+    const baseCost = costData.baseCost
+    
+    const levelUpCost = Math.floor(baseCost * Math.pow(1.065, curLevel - 1))
+
+    return {
+      unit,
+      amount: levelUpCost
+    }
+  }
+  this.upgrades.levelUp.getCostFor = this.upgrades.levelUp.getCostFor.bind(this)
 }
 
 Constants.prototype.constructor = Constants

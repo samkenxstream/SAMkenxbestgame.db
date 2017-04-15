@@ -6,7 +6,10 @@ const c = new Constants()
 
 const VanishingText = require('./components/Text/VanishingText')
 const StyledText = require('./components/Text/StyledText')
+
 const EmoteWarrior = require('./components/EmoteFighter.js')
+
+const UpgradesPanel = require('./components/UpgradesPanel.js')
 
 window.onload = () => {
   const MIN_TWITCH_WIDTH = 644
@@ -45,7 +48,10 @@ window.onload = () => {
     coinEmitter,
     chest,
     effects,
-    foreground
+    foreground,
+    HUD
+  
+  let upgradesPanel = null
 
   let zone = 0
 
@@ -144,6 +150,9 @@ window.onload = () => {
     this.game.load.image('chest_open', 'images/chest_open.png')
     this.game.load.image('reward_coins', 'images/rewards/coins_25.png')
 
+    // UI
+
+    this.game.load.spritesheet('button_default', 'images/UI/blueButtonSpritesheet.png', 55, 40)
     // this.game.stage.disableVisibilityChange = true
   }
 
@@ -328,11 +337,21 @@ window.onload = () => {
 
     this.game.stage.backgroundColor = 'rgb(238, 238, 238)'
 
-    // display order -- background first, foreground last
+
+    /* GROUPS */
+
     enemies.sprites = this.game.add.group()
     players.sprites = this.game.add.group()
     effects = this.game.add.group()
     foreground = this.game.add.group()
+
+    HUD = this.game.add.group()
+    HUD.fixedToCamera = true
+    HUD.cameraOffset.setTo(5, 15) // pixel offset like 200, 500, not like scale: 0.5, 0.1
+
+    /* end of groups */
+
+    upgradesPanel = new UpgradesPanel(this.game, HUD)
 
     this.game.time.advancedTiming = true // so we can read fps to calculate attack delays in seconds
 
@@ -393,7 +412,14 @@ window.onload = () => {
       window.setTimeout(() => { hero.tint = 0xffffff; } , 99)
       
     })
+    players.sprites.forEachAlive((hero) => {
+      const costData = c.upgrades.levelUp.getCostFor(hero.info.fighterClass, hero.combat.level)
+      upgradesPanel.setCostText(hero.z, costData.amount * 10)
+      // upgradesPanel.setCostText(0, cost1.amount)
 
+    })
+
+    // /* COIN EMITTER - not used
     coinEmitter = this.game.add.emitter(0, 0, 100) // max 100 coins at once
 
     coinEmitter.maxParticleScale = 0.5
@@ -419,7 +445,7 @@ window.onload = () => {
   function createEmoteEmitter() {
      // add emote emitters group to foreground (the parent group)
     
-    game.emoteEmit = game.add.emitter(0, 0) // max 100 sprites at once
+    game.emoteEmit = game.add.emitter(0, 0)
     const ee = game.emoteEmit
 
     ee.minParticleScale = .35
@@ -430,7 +456,7 @@ window.onload = () => {
 
     const initialEmoteId = c.emotes.KappaPride.id
     // frame, maxParticles (EVER), collide?, collideWorldBounds?
-    ee.initialState = [0, undefined, false, true]
+    ee.initialState = [0, 110, false, true]
     ee.makeParticles(initialEmoteId, ...ee.initialState)
     ee.name = initialEmoteId
 
@@ -443,7 +469,7 @@ window.onload = () => {
     foreground.add(ee);
   }
 
-  function dropEmotes (objWithXY, emoteId, count = 1) {
+  function dropEmotes (objWithXY, emoteId = c.emotes.KappaPride.id, count = 1) {
     game.emoteEmit.at(objWithXY)
     if (game.emoteEmit.name != emoteId) {
       if (c.emoteExists(emoteId)) {
@@ -455,7 +481,7 @@ window.onload = () => {
         return
       }
     }
-    if (game.emoteEmit.total >= game.emoteEmit.maxParticles) {
+    if (game.emoteEmit.total + count >= game.emoteEmit.maxParticles) {
       console.info(game.emoteEmit.total)
       game.emoteEmit.maxParticles = Math.floor(game.emoteEmit.total * 1.5);
     }
@@ -681,7 +707,7 @@ window.onload = () => {
   function spawnEnemyEmote (placesFromFront = 0, combatLevel = 0, emoteId) {
     const x = getCameraCenterX() + (ENEMY_WIDTH / 2) + (COMBAT_DISTANCE / 2) + 1
     const enemyEmote = new EmoteWarrior(game, {
-      emoteId: c.emotes.KappaPride && 'KappaPride',
+      emoteId: emoteId || c.emotes.KappaPride.id,
       combatLevel,
       x: x + DISTANCE_BETWEEN_EMOTES * placesFromFront,
       y: game.world.height - ENEMY_HEIGHT,
