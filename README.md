@@ -11,6 +11,14 @@ Gacha game for the gamingforgood website. Players collect streamers to fight for
   - [x] KappaPride
   - [ ] other emotes
 - [ ] level up buttons
+  - [ ] position rectangles and buttons
+  - [ ] display hero picture in rectangle
+  - [ ] cost: `<emoteAmount> [emoteSprite]`
+  ```javascript
+  // LVL up cost example for lvl 1 "mage"
+  const unitEmoteId = c.upgrades.levelUp.getCostFor('mage', 2)
+  ```
+
 - [ ] cooler effects based on combat level:
   - [ ] two flame sprites instead of one
   - [ ] jump higher on atk
@@ -21,6 +29,7 @@ Gacha game for the gamingforgood website. Players collect streamers to fight for
 // Spend [K] to lvl up Warrior  
 // Spend [P] to lvl up Mage
 
+## Level up interface (on left)
 | LVL UP | Warrior  
 |  4 [K] | Lvl 1
 
