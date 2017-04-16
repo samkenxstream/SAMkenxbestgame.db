@@ -158,8 +158,10 @@ window.onload = () => {
 
 
   function Fighter (teamObject, {team, fighterClass, x, y, combatLevel = 0, maxHealth, onHeroKilled}) {
+    const fighterImageKey = `${team}_${c.classes[fighterClass].key}`
+    Phaser.Sprite.call(this, game, x, y, fighterImageKey);
 
-    Phaser.Sprite.call(this, game, x, y, `${team}_${c.classes[fighterClass].key}`);
+    this.name = fighterImageKey
 
     const hitDamage = () => {
       if (Math.random() < this.combat.critChance) {
@@ -412,11 +414,14 @@ window.onload = () => {
       window.setTimeout(() => { hero.tint = 0xffffff; } , 99)
       
     })
+
+    /* UPGRADES PANEL */
+    let i = 0
     players.sprites.forEachAlive((hero) => {
       const costData = c.upgrades.levelUp.getCostFor(hero.info.fighterClass, hero.combat.level)
-      upgradesPanel.setCostText(hero.z, costData.amount * 10)
-      // upgradesPanel.setCostText(0, cost1.amount)
-
+      // upgradesPanel.setCostDisplay(i, costData.amount, costData.unit)
+      upgradesPanel.setHeroImage(i, hero.name)
+      i++
     })
 
     // /* COIN EMITTER - not used
@@ -1224,7 +1229,7 @@ window.onload = () => {
     if (window.location.href.indexOf('surge.sh') === -1) {
       // staging
       this.game.debug.geom(lineCameraMiddle, 'grey')
-      this.game.debug.text(players.state, 5, 20, 'blue')
+      // this.game.debug.text(players.state, 5, 20, 'blue')
       this.game.debug.text(enemies.state, this.game.camera.view.width - 110, 20, 'orange')
     }
 
