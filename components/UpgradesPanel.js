@@ -95,12 +95,10 @@ function UpgradesPanel (game, parentGroup, buttonOnClicks) {
     image1
   ]
 
-  // gfx.addChild(image0)
-  // gfx.addChild(image1)
+  gfx.addChild(image0)
+  gfx.addChild(image1)
 
   parentGroup.add(gfx)
-  parentGroup.add(image0)
-  parentGroup.add(image1)
   parentGroup.add(this.buttons)
 }
 
