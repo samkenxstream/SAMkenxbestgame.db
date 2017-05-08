@@ -1,6 +1,8 @@
 # gacha4good
 Gacha game for the gamingforgood website. Players collect streamers to fight for them against the evil twitch emotes.
 
+## Play the [latest prototype](https://gacha.surge.sh/)
+
 ## TODO
 - [x] remove splat text
 - [x] some visual indication of damage taken
